@@ -82,6 +82,17 @@ export function onBoardChanged(callback: () => void): Promise<UnlistenFn> {
   return listen("board-changed", callback);
 }
 
+export interface ProjectAllDone {
+  projectId: number;
+  projectName: string;
+}
+
+export function onProjectAllDone(
+  callback: (payload: ProjectAllDone) => void,
+): Promise<UnlistenFn> {
+  return listen<ProjectAllDone>("project-all-done", (event) => callback(event.payload));
+}
+
 // --- terminal ---
 
 export interface PtyOutput {

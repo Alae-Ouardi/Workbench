@@ -1,8 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
-import { createTask, deleteProject, listProjects, listTasks, onBoardChanged, setStatus } from "./api";
+import {
+  createTask,
+  deleteProject,
+  listProjects,
+  listTasks,
+  onBoardChanged,
+  onProjectAllDone,
+  setStatus,
+  type ProjectAllDone,
+} from "./api";
 import { Board } from "./components/Board";
 import { ContextBanner } from "./components/ContextBanner";
+import { ProjectDoneBanner } from "./components/ProjectDoneBanner";
 import { NewProjectModal } from "./components/NewProjectModal";
 import { NewTaskModal } from "./components/NewTaskModal";
 import { Sidebar } from "./components/Sidebar";
@@ -22,6 +32,7 @@ export default function App() {
   const [panel, setPanel] = useState<Panel>("board");
   const [terminalCwd, setTerminalCwd] = useState<string>("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [doneBanners, setDoneBanners] = useState<ProjectAllDone[]>([]);
   const unlistenRef = useRef<(() => void) | null>(null);
 
   const refresh = useCallback(async () => {
@@ -45,6 +56,20 @@ export default function App() {
       unlisten?.();
     };
   }, [refresh]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    onProjectAllDone((payload) => {
+      setDoneBanners((prev) =>
+        prev.some((b) => b.projectId === payload.projectId) ? prev : [...prev, payload]
+      );
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   async function handleMove(id: number, status: Status) {
     const result = await setStatus(id, status);
@@ -122,6 +147,15 @@ export default function App() {
         <div className="flex flex-1 overflow-hidden">
           {panel === "board" && (
             <div className="flex flex-1 flex-col overflow-hidden">
+              {doneBanners.map((banner) => (
+                <ProjectDoneBanner
+                  key={banner.projectId}
+                  projectName={banner.projectName}
+                  onDismiss={() =>
+                    setDoneBanners((prev) => prev.filter((b) => b.projectId !== banner.projectId))
+                  }
+                />
+              ))}
               {selectedProjectId !== null && (
                 <ContextBanner
                   projectId={selectedProjectId}

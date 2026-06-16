@@ -1,4 +1,5 @@
 import { useState } from "react";
+import packageJson from "../../package.json";
 import type { ProjectSummary } from "../types";
 
 interface SidebarProps {
@@ -81,6 +82,9 @@ export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNew
           onCancel={() => setConfirmId(null)}
         />
       )}
+      <div className="shrink-0 border-t border-[#1c2230] px-4 py-2">
+        <p className="text-[10px] text-slate-700">v{packageJson.version}</p>
+      </div>
     </aside>
   );
 }

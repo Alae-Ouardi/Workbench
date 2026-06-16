@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import packageJson from "../../package.json";
 import {
   createTask,
   deleteTask,
@@ -157,10 +158,11 @@ export function TrayPopover() {
         )}
       </div>
 
-      <div className="shrink-0 border-t border-white/[0.04] px-4 py-1.5">
-        <p className="text-center text-[10px] text-slate-700">
+      <div className="flex shrink-0 items-center justify-between border-t border-white/[0.04] px-4 py-1.5">
+        <span className="text-[10px] text-slate-700">v{packageJson.version}</span>
+        <span className="text-[10px] text-slate-700">
           {activeTasks.length} active {activeTasks.length === 1 ? "task" : "tasks"}
-        </p>
+        </span>
       </div>
     </div>
   );
