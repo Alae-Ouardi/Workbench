@@ -8,6 +8,9 @@ pub enum Error {
     #[error("project not found: {0}")]
     ProjectNotFound(String),
 
+    #[error("ambiguous project '{key}'; multiple matches: {matches:?}")]
+    AmbiguousProject { key: String, matches: Vec<String> },
+
     #[error("invalid status '{0}' (expected one of: open, waiting, in_progress, review, done)")]
     InvalidStatus(String),
 

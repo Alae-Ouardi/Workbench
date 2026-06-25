@@ -67,17 +67,31 @@ impl Db {
         })
     }
 
+    /// Look up a single project by path. Errors if multiple projects share this
+    /// path so callers must disambiguate with a project id or unique name.
     pub fn find_project_by_path(&self, path: &str) -> Result<Option<Project>> {
+        let mut projects = self.find_projects_by_path(path)?;
+        match projects.len() {
+            0 => Ok(None),
+            1 => Ok(Some(projects.remove(0))),
+            _ => Err(Error::AmbiguousProject {
+                key: path.to_string(),
+                matches: projects
+                    .into_iter()
+                    .map(|p| format!("#{} {}", p.id, p.name))
+                    .collect(),
+            }),
+        }
+    }
+
+    /// Return every project that points to the given path, newest first.
+    pub fn find_projects_by_path(&self, path: &str) -> Result<Vec<Project>> {
         let root = resolve_project_root(path);
-        let project = self
-            .conn
-            .query_row(
-                &format!("SELECT {PROJECT_COLUMNS} FROM projects WHERE path = ?1"),
-                params![root],
-                row_to_project,
-            )
-            .optional()?;
-        Ok(project)
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {PROJECT_COLUMNS} FROM projects WHERE path = ?1 ORDER BY created_at DESC"
+        ))?;
+        let rows = stmt.query_map(params![root], row_to_project)?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
     /// Look up a project by id, exact path, or name (in that order).
@@ -98,14 +112,24 @@ impl Db {
         if let Some(p) = self.find_project_by_path(key)? {
             return Ok(p);
         }
-        self.conn
-            .query_row(
-                &format!("SELECT {PROJECT_COLUMNS} FROM projects WHERE name = ?1"),
-                params![key],
-                row_to_project,
-            )
-            .optional()?
-            .ok_or_else(|| Error::ProjectNotFound(key.to_string()))
+        let mut by_name: Vec<Project> = {
+            let mut stmt = self
+                .conn
+                .prepare(&format!("SELECT {PROJECT_COLUMNS} FROM projects WHERE name = ?1"))?;
+            let rows = stmt.query_map(params![key], row_to_project)?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        };
+        match by_name.len() {
+            0 => Err(Error::ProjectNotFound(key.to_string())),
+            1 => Ok(by_name.remove(0)),
+            _ => Err(Error::AmbiguousProject {
+                key: key.to_string(),
+                matches: by_name
+                    .into_iter()
+                    .map(|p| format!("#{} {}", p.id, p.name))
+                    .collect(),
+            }),
+        }
     }
 
     pub fn list_projects(&self) -> Result<Vec<ProjectSummary>> {
@@ -184,16 +208,17 @@ impl Db {
         self.find_project(&project.id.to_string())
     }
 
-    /// Create (or update) a project with an explicit name and AI brief description.
-    /// The description is stored as `original_request` so `get_briefing` exposes
-    /// it to any AI that picks up work in this directory.
+    /// Create a new request-project for the given folder. Multiple projects may
+    /// share the same path, each with its own context and task list.
     pub fn create_project(&self, path: &str, name: &str, description: &str) -> Result<Project> {
-        let project = self.ensure_project(path, Some(name))?;
+        let root = resolve_project_root(path);
+        let created_at = now();
         self.conn.execute(
-            "UPDATE projects SET name = ?1, original_request = ?2 WHERE id = ?3",
-            params![name, description, project.id],
+            "INSERT INTO projects (name, path, created_at, original_request) VALUES (?1, ?2, ?3, ?4)",
+            params![name, root, created_at, description],
         )?;
-        self.find_project(&project.id.to_string())
+        let id = self.conn.last_insert_rowid();
+        self.find_project(&id.to_string())
     }
 
     /// Delete a project and all its tasks, comments, and history (cascades via FK).

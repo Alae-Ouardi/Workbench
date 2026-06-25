@@ -387,11 +387,11 @@ fn create_project_sets_name_and_brief() {
     assert_eq!(p.original_request, "Build a task manager with AI support");
     assert_eq!(p.path, "/tmp/new-proj");
 
-    // Calling again on the same path updates name + brief.
+    // Calling again on the same path creates a second request-project.
     let p2 = db
         .create_project("/tmp/new-proj", "My App v2", "Updated brief")
         .unwrap();
-    assert_eq!(p2.id, p.id); // same project row
+    assert_ne!(p2.id, p.id); // new project row
     assert_eq!(p2.name, "My App v2");
     assert_eq!(p2.original_request, "Updated brief");
 }
