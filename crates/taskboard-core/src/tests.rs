@@ -419,6 +419,67 @@ fn create_project_sets_name_and_brief() {
 }
 
 #[test]
+fn multiple_projects_per_path_are_isolated() {
+    let db = db();
+    let p1 = db.create_project("/tmp/shared", "Request A", "first context").unwrap();
+    let p2 = db.create_project("/tmp/shared", "Request B", "second context").unwrap();
+    assert_ne!(p1.id, p2.id);
+    assert_eq!(p1.path, p2.path);
+
+    let t1 = db.create_task(p1.id, &task("task for A"), "ai").unwrap();
+    let t2 = db.create_task(p2.id, &task("task for B"), "ai").unwrap();
+
+    let tasks1 = db
+        .list_tasks(&TaskFilter {
+            project_id: Some(p1.id),
+            ..Default::default()
+        })
+        .unwrap();
+    let tasks2 = db
+        .list_tasks(&TaskFilter {
+            project_id: Some(p2.id),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(tasks1.len(), 1);
+    assert_eq!(tasks2.len(), 1);
+    assert_eq!(tasks1[0].id, t1.id);
+    assert_eq!(tasks2[0].id, t2.id);
+
+    // Context is per-project.
+    db.set_project_context_by_id(p1.id, "req A", "plan A").unwrap();
+    db.set_project_context_by_id(p2.id, "req B", "plan B").unwrap();
+    let b1 = db.get_briefing_by_id(p1.id).unwrap();
+    let b2 = db.get_briefing_by_id(p2.id).unwrap();
+    assert_eq!(b1.project.original_request, "req A");
+    assert_eq!(b2.project.original_request, "req B");
+}
+
+#[test]
+fn find_project_by_path_errors_when_ambiguous() {
+    let db = db();
+    db.create_project("/tmp/ambig", "One", "").unwrap();
+    db.create_project("/tmp/ambig", "Two", "").unwrap();
+
+    assert!(matches!(
+        db.find_project_by_path("/tmp/ambig"),
+        Err(Error::AmbiguousProject { .. })
+    ));
+}
+
+#[test]
+fn find_project_by_name_errors_when_ambiguous() {
+    let db = db();
+    db.create_project("/tmp/a", "same-name", "").unwrap();
+    db.create_project("/tmp/b", "same-name", "").unwrap();
+
+    assert!(matches!(
+        db.find_project("same-name"),
+        Err(Error::AmbiguousProject { .. })
+    ));
+}
+
+#[test]
 fn migration_adds_columns_to_legacy_projects_table() {
 
     // Simulate a pre-handoff DB: create a projects table with only the original
