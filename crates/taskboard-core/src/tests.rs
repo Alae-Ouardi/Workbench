@@ -11,12 +11,17 @@ fn task(title: &str) -> NewTask {
     }
 }
 
+fn project_id(db: &Db, path: &str) -> i64 {
+    db.create_project(path, path, "").unwrap().id
+}
+
 #[test]
 fn create_and_get_roundtrip() {
     let db = db();
+    let pid = project_id(&db, "/tmp/proj-a");
     let t = db
         .create_task(
-            "/tmp/proj-a",
+            pid,
             &NewTask {
                 title: "Build the thing".into(),
                 description: "details".into(),
@@ -66,10 +71,11 @@ fn project_resolves_to_git_root() {
 #[test]
 fn dependencies_make_task_waiting_and_auto_promote() {
     let db = db();
-    let a = db.create_task("/tmp/p", &task("A"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/p");
+    let a = db.create_task(pid, &task("A"), "ai").unwrap();
     let b = db
         .create_task(
-            "/tmp/p",
+            pid,
             &NewTask {
                 title: "B".into(),
                 depends_on: vec![a.id],
@@ -90,11 +96,12 @@ fn dependencies_make_task_waiting_and_auto_promote() {
 #[test]
 fn promotion_waits_for_all_dependencies() {
     let db = db();
-    let a = db.create_task("/tmp/p", &task("A"), "ai").unwrap();
-    let b = db.create_task("/tmp/p", &task("B"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/p");
+    let a = db.create_task(pid, &task("A"), "ai").unwrap();
+    let b = db.create_task(pid, &task("B"), "ai").unwrap();
     let c = db
         .create_task(
-            "/tmp/p",
+            pid,
             &NewTask {
                 title: "C".into(),
                 depends_on: vec![a.id, b.id],
@@ -116,9 +123,10 @@ fn promotion_waits_for_all_dependencies() {
 #[test]
 fn batch_create_supports_negative_index_deps() {
     let db = db();
+    let pid = project_id(&db, "/tmp/p");
     let tasks = db
         .create_tasks(
-            "/tmp/p",
+            pid,
             &[
                 task("first"),
                 NewTask {
@@ -140,10 +148,11 @@ fn batch_create_supports_negative_index_deps() {
 #[test]
 fn cycle_and_self_dependency_rejected() {
     let db = db();
-    let a = db.create_task("/tmp/p", &task("A"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/p");
+    let a = db.create_task(pid, &task("A"), "ai").unwrap();
     let b = db
         .create_task(
-            "/tmp/p",
+            pid,
             &NewTask {
                 title: "B".into(),
                 depends_on: vec![a.id],
@@ -166,10 +175,11 @@ fn cycle_and_self_dependency_rejected() {
 #[test]
 fn clearing_dependencies_reopens_waiting_task() {
     let db = db();
-    let a = db.create_task("/tmp/p", &task("A"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/p");
+    let a = db.create_task(pid, &task("A"), "ai").unwrap();
     let b = db
         .create_task(
-            "/tmp/p",
+            pid,
             &NewTask {
                 title: "B".into(),
                 depends_on: vec![a.id],
@@ -186,7 +196,8 @@ fn clearing_dependencies_reopens_waiting_task() {
 #[test]
 fn comments_are_recorded_with_events() {
     let db = db();
-    let t = db.create_task("/tmp/p", &task("T"), "claude").unwrap();
+    let pid = project_id(&db, "/tmp/p");
+    let t = db.create_task(pid, &task("T"), "claude").unwrap();
     db.add_comment(t.id, "claude", "handing off: did X, next do Y")
         .unwrap();
     let detail = db.get_task(t.id).unwrap();
@@ -197,8 +208,10 @@ fn comments_are_recorded_with_events() {
 #[test]
 fn list_tasks_filters_by_project_and_status() {
     let db = db();
-    let t1 = db.create_task("/tmp/p1", &task("one"), "ai").unwrap();
-    let _t2 = db.create_task("/tmp/p2", &task("two"), "ai").unwrap();
+    let p1 = project_id(&db, "/tmp/p1");
+    let p2 = project_id(&db, "/tmp/p2");
+    let t1 = db.create_task(p1, &task("one"), "ai").unwrap();
+    let _t2 = db.create_task(p2, &task("two"), "ai").unwrap();
     db.set_status(t1.id, Status::InProgress, "ai").unwrap();
 
     let all = db.list_tasks(&TaskFilter::default()).unwrap();
@@ -231,7 +244,8 @@ fn invalid_status_string_is_rejected() {
 #[test]
 fn update_and_delete_task() {
     let db = db();
-    let t = db.create_task("/tmp/p", &task("old"), "me").unwrap();
+    let pid = project_id(&db, "/tmp/p");
+    let t = db.create_task(pid, &task("old"), "me").unwrap();
     let updated = db
         .update_task(
             t.id,
@@ -253,8 +267,9 @@ fn update_and_delete_task() {
 #[test]
 fn project_summary_counts() {
     let db = db();
-    let t1 = db.create_task("/tmp/px", &task("a"), "ai").unwrap();
-    let _ = db.create_task("/tmp/px", &task("b"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/px");
+    let t1 = db.create_task(pid, &task("a"), "ai").unwrap();
+    let _ = db.create_task(pid, &task("b"), "ai").unwrap();
     db.set_status(t1.id, Status::Done, "ai").unwrap();
 
     let projects = db.list_projects().unwrap();
@@ -271,7 +286,8 @@ fn project_summary_counts() {
 #[test]
 fn set_project_context_roundtrip() {
     let db = db();
-    db.create_task("/tmp/ctx", &task("seed"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/ctx");
+    db.create_task(pid, &task("seed"), "ai").unwrap();
     let p = db
         .set_project_context("/tmp/ctx", "add multi-currency support", "1. model\n2. service")
         .unwrap();
@@ -301,7 +317,8 @@ fn set_project_context_autocreates_project() {
 #[test]
 fn set_handoff_records_state_and_event() {
     let db = db();
-    let t = db.create_task("/tmp/h", &task("work"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/h");
+    let t = db.create_task(pid, &task("work"), "ai").unwrap();
     let p = db
         .set_handoff("/tmp/h", "claude-code", "sess-abc", "half done, do rounding next", Some(t.id))
         .unwrap();
@@ -319,8 +336,9 @@ fn set_handoff_records_state_and_event() {
 #[test]
 fn briefing_resume_uses_flag_when_not_done() {
     let db = db();
-    let a = db.create_task("/tmp/b", &task("A"), "ai").unwrap();
-    let b = db.create_task("/tmp/b", &task("B"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/b");
+    let a = db.create_task(pid, &task("A"), "ai").unwrap();
+    let b = db.create_task(pid, &task("B"), "ai").unwrap();
     db.set_handoff("/tmp/b", "codex", "s1", "on B", Some(b.id))
         .unwrap();
 
@@ -334,8 +352,9 @@ fn briefing_resume_uses_flag_when_not_done() {
 #[test]
 fn briefing_resume_falls_back_when_flag_done() {
     let db = db();
-    let a = db.create_task("/tmp/bf", &task("A"), "ai").unwrap();
-    let b = db.create_task("/tmp/bf", &task("B"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/bf");
+    let a = db.create_task(pid, &task("A"), "ai").unwrap();
+    let b = db.create_task(pid, &task("B"), "ai").unwrap();
     db.set_handoff("/tmp/bf", "codex", "s", "on A", Some(a.id))
         .unwrap();
     // Flagged task A is completed -> resume should fall back to next open (B).
@@ -348,8 +367,9 @@ fn briefing_resume_falls_back_when_flag_done() {
 #[test]
 fn briefing_resume_first_open_with_no_flag() {
     let db = db();
-    let a = db.create_task("/tmp/nf", &task("A"), "ai").unwrap();
-    let _b = db.create_task("/tmp/nf", &task("B"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/nf");
+    let a = db.create_task(pid, &task("A"), "ai").unwrap();
+    let _b = db.create_task(pid, &task("B"), "ai").unwrap();
 
     let briefing = db.get_briefing("/tmp/nf").unwrap();
     // No handoff flag set -> first open task by order.
@@ -359,8 +379,9 @@ fn briefing_resume_first_open_with_no_flag() {
 #[test]
 fn briefing_prefers_in_progress_over_open() {
     let db = db();
-    let _a = db.create_task("/tmp/ip", &task("A"), "ai").unwrap();
-    let b = db.create_task("/tmp/ip", &task("B"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/ip");
+    let _a = db.create_task(pid, &task("A"), "ai").unwrap();
+    let b = db.create_task(pid, &task("B"), "ai").unwrap();
     db.set_status(b.id, Status::InProgress, "ai").unwrap();
 
     let briefing = db.get_briefing("/tmp/ip").unwrap();
@@ -370,7 +391,8 @@ fn briefing_prefers_in_progress_over_open() {
 #[test]
 fn briefing_resume_none_when_all_done() {
     let db = db();
-    let a = db.create_task("/tmp/ad", &task("A"), "ai").unwrap();
+    let pid = project_id(&db, "/tmp/ad");
+    let a = db.create_task(pid, &task("A"), "ai").unwrap();
     db.set_status(a.id, Status::Done, "ai").unwrap();
 
     let briefing = db.get_briefing("/tmp/ad").unwrap();

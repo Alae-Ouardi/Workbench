@@ -23,12 +23,11 @@ pub struct TaskUpdate {
 }
 
 impl Db {
-    /// Create a single task in the project at `project_path` (project is
-    /// created on first use). If the task has unfinished dependencies it
-    /// starts as `waiting`, otherwise `open`.
-    pub fn create_task(&self, project_path: &str, new: &NewTask, actor: &str) -> Result<Task> {
+    /// Create a single task in the given project. If the task has unfinished
+    /// dependencies it starts as `waiting`, otherwise `open`.
+    pub fn create_task(&self, project_id: i64, new: &NewTask, actor: &str) -> Result<Task> {
         let tx = self.conn.unchecked_transaction()?;
-        let task = self.insert_task(project_path, new, actor)?;
+        let task = self.insert_task(project_id, new, actor)?;
         tx.commit()?;
         Ok(task)
     }
@@ -39,7 +38,7 @@ impl Db {
     /// Positive values are existing task IDs.
     pub fn create_tasks(
         &self,
-        project_path: &str,
+        project_id: i64,
         new_tasks: &[NewTask],
         actor: &str,
     ) -> Result<Vec<Task>> {
@@ -62,21 +61,22 @@ impl Db {
                     }
                 })
                 .collect::<Result<Vec<i64>>>()?;
-            created.push(self.insert_task(project_path, &resolved, actor)?);
+            created.push(self.insert_task(project_id, &resolved, actor)?);
         }
         tx.commit()?;
         Ok(created)
     }
 
-    fn insert_task(&self, project_path: &str, new: &NewTask, actor: &str) -> Result<Task> {
-        let project = self.ensure_project(project_path, None)?;
+    fn insert_task(&self, project_id: i64, new: &NewTask, actor: &str) -> Result<Task> {
+        // Verify the project exists; the caller must supply a valid project_id.
+        self.find_project(&project_id.to_string())?;
         let ts = now();
         let priority = new.priority.unwrap_or(Priority::Normal);
         let kind = new.kind.unwrap_or(Kind::Task);
         self.conn.execute(
             "INSERT INTO tasks (project_id, title, description, status, kind, assignee, priority, position, created_at, updated_at)
              VALUES (?1, ?2, ?3, 'open', ?4, ?5, ?6, 0, ?7, ?7)",
-            params![project.id, new.title, new.description, kind.as_str(), new.assignee, priority.as_str(), ts],
+            params![project_id, new.title, new.description, kind.as_str(), new.assignee, priority.as_str(), ts],
         )?;
         let id = self.conn.last_insert_rowid();
         self.conn.execute(
