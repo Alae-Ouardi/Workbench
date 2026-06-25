@@ -143,9 +143,12 @@ function SidebarItem({ label, count, selected, inProgress, title, onClick, onDel
           selected ? "bg-[#1b2232] text-slate-100" : "text-slate-400 hover:bg-[#141927]"
         }`}
       >
-        <span className="flex items-center gap-1.5 truncate">
-          {inProgress && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-violet-400" />}
-          <span className="truncate">{label}</span>
+        <span className="flex min-w-0 flex-1 flex-col truncate">
+          <span className="flex items-center gap-1.5 truncate">
+            {inProgress && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-violet-400" />}
+            <span className="truncate">{label}</span>
+          </span>
+          {title && <span className="truncate text-[10px] text-slate-600">{title}</span>}
         </span>
         {count > 0 && <span className="ml-2 shrink-0 text-xs text-slate-500">{count}</span>}
       </button>
