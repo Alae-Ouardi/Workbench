@@ -41,7 +41,7 @@ pub fn get_task(id: i64) -> Result<TaskDetail, String> {
 
 #[tauri::command]
 pub fn create_task(
-    project_path: String,
+    project_id: i64,
     title: String,
     description: String,
     kind: String,
@@ -57,7 +57,7 @@ pub fn create_task(
         depends_on: Vec::new(),
     };
     db()?
-        .create_task(&project_path, &new, APP_ACTOR)
+        .create_task(project_id, &new, APP_ACTOR)
         .map_err(|e| e.to_string())
 }
 
