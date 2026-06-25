@@ -103,6 +103,19 @@ fn handle(method: &str, params: &Value) -> Result<Value, (i64, String)> {
 fn tool_definitions() -> Value {
     json!([
         {
+            "name": "create_project",
+            "description": "Create a new request-project for a folder. Each request should be its own project, even if it points to the same folder as an existing project.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute path of the project directory (resolved to git root)."},
+                    "name": {"type": "string", "description": "Display name for the project."},
+                    "description": {"type": "string", "description": "The AI brief / original request for this project."}
+                },
+                "required": ["path", "name"]
+            }
+        },
+        {
             "name": "list_projects",
             "description": "List all projects on the TaskBoard with per-status task counts.",
             "inputSchema": {"type": "object", "properties": {}}
@@ -135,7 +148,7 @@ fn tool_definitions() -> Value {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "project_path": {"type": "string", "description": "Absolute path of the project directory (it is resolved to the git root)."},
+                    "project_id": {"type": "integer", "description": "The project id to create tasks in. Call list_projects if you don't know it."},
                     "tasks": {
                         "type": "array",
                         "items": {
@@ -153,7 +166,7 @@ fn tool_definitions() -> Value {
                     },
                     "actor": {"type": "string", "description": "Your agent name, e.g. claude-code."}
                 },
-                "required": ["project_path", "tasks"]
+                "required": ["project_id", "tasks"]
             }
         },
         {
@@ -223,53 +236,53 @@ fn tool_definitions() -> Value {
         {
             "name": "get_briefing",
             "description": "Call this FIRST whenever you start work on a project. Returns the project's north-star context (the user's original request and the approved plan summary), where the last AI stopped (last actor, session id, handoff note, and the flagged task), the task you should resume on, and the full ordered task list. Read it, then resume at resume_task.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "project_path": {"type": "string", "description": "Absolute path of the project directory (resolved to git root)."}
-                },
-                "required": ["project_path"]
-            }
-        },
-        {
-            "name": "set_project_context",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "The project id. Call list_projects if you don't know it."}
+                    },
+                    "required": ["project_id"]
+                }
+            },
+            {
+                "name": "set_project_context",
             "description": "Save the project's north-star context. Call this right after the user approves a plan, together with create_tasks: store the user's verbatim original request and a short summary of the approved plan. Any AI that picks up later reads this to know the goal and the agreed approach.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "project_path": {"type": "string", "description": "Absolute path of the project directory."},
-                    "original_request": {"type": "string", "description": "The user's verbatim original request."},
-                    "plan_summary": {"type": "string", "description": "Short summary of the approved plan / agreed approach."}
-                },
-                "required": ["project_path", "original_request", "plan_summary"]
-            }
-        },
-        {
-            "name": "delete_project",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "The project id."},
+                        "original_request": {"type": "string", "description": "The user's verbatim original request."},
+                        "plan_summary": {"type": "string", "description": "Short summary of the approved plan / agreed approach."}
+                    },
+                    "required": ["project_id", "original_request", "plan_summary"]
+                }
+            },
+            {
+                "name": "delete_project",
             "description": "Delete a project and ALL its tasks, comments, and history permanently. This cannot be undone.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "project_path": {"type": "string", "description": "Project id, absolute path, or name."}
-                },
-                "required": ["project_path"]
-            }
-        },
-        {
-            "name": "save_handoff",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "The project id."}
+                    },
+                    "required": ["project_id"]
+                }
+            },
+            {
+                "name": "save_handoff",
             "description": "Record where you stopped so the next AI (or a future you) can resume cleanly. Call this after each phase and before you stop — especially when nearing a usage limit. Provide the task you're on (current_task_id), a short note on what's done and what's next, and your session id so the user can resume this exact session later (Claude Code: `claude --resume <id>`; Codex/OpenCode have equivalent session ids).",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "project_path": {"type": "string", "description": "Absolute path of the project directory."},
-                    "actor": {"type": "string", "description": "Your agent name, e.g. claude-code."},
-                    "session_id": {"type": "string", "description": "Your current session id, so the user can resume this exact session."},
-                    "note": {"type": "string", "description": "Short 'what's done / what's next' handoff note."},
-                    "current_task_id": {"type": "integer", "description": "The task you are on / the pickup point for the next AI."}
-                },
-                "required": ["project_path", "note"]
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "The project id."},
+                        "actor": {"type": "string", "description": "Your agent name, e.g. claude-code."},
+                        "session_id": {"type": "string", "description": "Your current session id, so the user can resume this exact session."},
+                        "note": {"type": "string", "description": "Short 'what's done / what's next' handoff note."},
+                        "current_task_id": {"type": "integer", "description": "The task you are on / the pickup point for the next AI."}
+                    },
+                    "required": ["project_id", "note"]
+                }
             }
-        }
     ])
 }
 
@@ -282,6 +295,12 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
         .to_string();
 
     match name {
+        "create_project" => {
+            let path = require_str(args, "path")?;
+            let name = require_str(args, "name")?;
+            let description = args.get("description").and_then(Value::as_str).unwrap_or("");
+            Ok(serde_json::to_value(db.create_project(path, name, description)?)?)
+        }
         "list_projects" => Ok(serde_json::to_value(db.list_projects()?)?),
         "list_tasks" => {
             let project_id = match args.get("project").and_then(Value::as_str) {
@@ -300,10 +319,10 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
         }
         "get_task" => Ok(serde_json::to_value(db.get_task(require_id(args)?)?)?),
         "create_tasks" => {
-            let project_path = args
-                .get("project_path")
-                .and_then(Value::as_str)
-                .ok_or_else(|| anyhow::anyhow!("missing required argument: project_path"))?;
+            let project_id = args
+                .get("project_id")
+                .and_then(Value::as_i64)
+                .ok_or_else(|| anyhow::anyhow!("missing required argument: project_id"))?;
             let raw_tasks = args
                 .get("tasks")
                 .and_then(Value::as_array)
@@ -315,7 +334,7 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
                 new_tasks.push(new);
             }
             Ok(serde_json::to_value(db.create_tasks(
-                project_path,
+                project_id,
                 &new_tasks,
                 &actor,
             )?)?)
@@ -381,32 +400,44 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
             Ok(json!({"deleted": id}))
         }
         "delete_project" => {
-            let project_path = require_str(args, "project_path")?;
-            let project = db.find_project(project_path)?;
+            let project_id = args
+                .get("project_id")
+                .and_then(Value::as_i64)
+                .ok_or_else(|| anyhow::anyhow!("missing required argument: project_id"))?;
+            let project = db.find_project(&project_id.to_string())?;
             db.delete_project(project.id)?;
             Ok(json!({"deleted": project.id, "name": project.name}))
         }
         "get_briefing" => {
-            let project_path = require_str(args, "project_path")?;
-            Ok(serde_json::to_value(db.get_briefing(project_path)?)?)
+            let project_id = args
+                .get("project_id")
+                .and_then(Value::as_i64)
+                .ok_or_else(|| anyhow::anyhow!("missing required argument: project_id"))?;
+            Ok(serde_json::to_value(db.get_briefing_by_id(project_id)?)?)
         }
         "set_project_context" => {
-            let project_path = require_str(args, "project_path")?;
+            let project_id = args
+                .get("project_id")
+                .and_then(Value::as_i64)
+                .ok_or_else(|| anyhow::anyhow!("missing required argument: project_id"))?;
             let original_request = require_str(args, "original_request")?;
             let plan_summary = require_str(args, "plan_summary")?;
-            Ok(serde_json::to_value(db.set_project_context(
-                project_path,
+            Ok(serde_json::to_value(db.set_project_context_by_id(
+                project_id,
                 original_request,
                 plan_summary,
             )?)?)
         }
         "save_handoff" => {
-            let project_path = require_str(args, "project_path")?;
+            let project_id = args
+                .get("project_id")
+                .and_then(Value::as_i64)
+                .ok_or_else(|| anyhow::anyhow!("missing required argument: project_id"))?;
             let note = require_str(args, "note")?;
             let session_id = args.get("session_id").and_then(Value::as_str).unwrap_or("");
             let current_task_id = args.get("current_task_id").and_then(Value::as_i64);
-            Ok(serde_json::to_value(db.set_handoff(
-                project_path,
+            Ok(serde_json::to_value(db.set_handoff_by_id(
+                project_id,
                 &actor,
                 session_id,
                 note,

@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use taskboard_core::{Db, Kind, NewTask, Priority, Status, TaskFilter, TaskUpdate};
+use taskboard_core::{Db, Kind, NewTask, Priority, Project, Status, TaskFilter, TaskUpdate};
 
 /// TaskBoard: a task dashboard shared between you and your AI coding tools.
 ///
@@ -31,6 +31,18 @@ struct Cli {
 enum Command {
     /// List all projects with task counts.
     Projects,
+    /// Create a project (request) for a folder.
+    CreateProject {
+        /// Project directory (default: current directory; resolved to git root).
+        #[arg(long, short)]
+        path: Option<String>,
+        /// Display name (default: folder basename).
+        #[arg(long, short)]
+        name: Option<String>,
+        /// The AI brief / original request for this project.
+        #[arg(long, short)]
+        description: Option<String>,
+    },
     /// Create a task (or bug, with --bug) in a project.
     Add {
         title: String,
@@ -145,6 +157,22 @@ fn main() -> Result<()> {
     let json = cli.json;
 
     match cli.command {
+        Command::CreateProject { path, name, description } => {
+            let path = path.unwrap_or_else(cwd);
+            let name = name.unwrap_or_else(|| {
+                std::path::Path::new(&path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| path.clone())
+            });
+            let description = description.unwrap_or_default();
+            let p = db.create_project(&path, &name, &description)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&p)?);
+            } else {
+                println!("Created project '{}' (#{}) at {}", p.name, p.id, p.path);
+            }
+        }
         Command::Projects => {
             let projects = db.list_projects()?;
             if json {
@@ -162,7 +190,7 @@ fn main() -> Result<()> {
             bug,
             depends_on,
         } => {
-            let project = project.unwrap_or_else(cwd);
+            let project = resolve_project(&db, project)?;
             let new = NewTask {
                 title,
                 description,
@@ -171,7 +199,7 @@ fn main() -> Result<()> {
                 priority: priority.as_deref().map(Priority::from_str).transpose()?,
                 depends_on,
             };
-            let task = db.create_task(&project, &new, &actor)?;
+            let task = db.create_task(project.id, &new, &actor)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&task)?);
             } else {
@@ -269,11 +297,8 @@ fn main() -> Result<()> {
             }
         }
         Command::Briefing { project } => {
-            let path = match project {
-                Some(key) => db.find_project(&key)?.path,
-                None => cwd(),
-            };
-            let briefing = db.get_briefing(&path)?;
+            let project = resolve_project(&db, project)?;
+            let briefing = db.get_briefing_by_id(project.id)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&briefing)?);
             } else {
@@ -285,8 +310,8 @@ fn main() -> Result<()> {
             request,
             plan,
         } => {
-            let path = project.unwrap_or_else(cwd);
-            let p = db.set_project_context(&path, &request, &plan)?;
+            let project = resolve_project(&db, project)?;
+            let p = db.set_project_context_by_id(project.id, &request, &plan)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&p)?);
             } else {
@@ -299,8 +324,8 @@ fn main() -> Result<()> {
             task,
             session,
         } => {
-            let path = project.unwrap_or_else(cwd);
-            let p = db.set_handoff(&path, &actor, &session, &note, task)?;
+            let project = resolve_project(&db, project)?;
+            let p = db.set_handoff_by_id(project.id, &actor, &session, &note, task)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&p)?);
             } else {
@@ -319,4 +344,29 @@ fn cwd() -> String {
     std::env::current_dir()
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|_| ".".to_string())
+}
+
+/// Resolve an explicit project key, or fall back to the cwd and require
+/// disambiguation when multiple projects share the same folder.
+fn resolve_project(db: &Db, project_arg: Option<String>) -> Result<Project> {
+    match project_arg {
+        Some(key) => Ok(db.find_project(&key)?),
+        None => {
+            let matches = db.find_projects_by_path(&cwd())?;
+            match matches.len() {
+                0 => anyhow::bail!(
+                    "No project found for {}. Create one with: taskboard create-project --path <dir> --name <name>",
+                    cwd()
+                ),
+                1 => Ok(matches.into_iter().next().unwrap()),
+                _ => {
+                    eprintln!("Multiple projects match {}:", cwd());
+                    for p in &matches {
+                        eprintln!("  #{} {}", p.id, p.name);
+                    }
+                    anyhow::bail!("Specify which project with --project <id or name>")
+                }
+            }
+        }
+    }
 }

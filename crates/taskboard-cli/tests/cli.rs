@@ -16,7 +16,12 @@ fn cli_round_trip() {
     let proj = proj.to_str().unwrap();
 
     cmd(&db)
-        .args(["add", "First task", "--project", proj, "--bug", "--priority", "high"])
+        .args(["create-project", "--path", proj, "--name", "myproj"])
+        .assert()
+        .success();
+
+    cmd(&db)
+        .args(["add", "First task", "--project", "myproj", "--bug", "--priority", "high"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Created #1 [open] First task"));
@@ -66,23 +71,25 @@ fn cli_context_handoff_briefing() {
     std::fs::create_dir_all(&proj).unwrap();
     let proj = proj.to_str().unwrap();
 
-    cmd(&db).args(["add", "Task A", "--project", proj]).assert().success();
-    cmd(&db).args(["add", "Task B", "--project", proj]).assert().success();
+    cmd(&db).args(["create-project", "--path", proj, "--name", "p"]).assert().success();
+
+    cmd(&db).args(["add", "Task A", "--project", "p"]).assert().success();
+    cmd(&db).args(["add", "Task B", "--project", "p"]).assert().success();
 
     cmd(&db)
-        .args(["context", "--project", proj, "--request", "build the widget", "--plan", "1. A\n2. B"])
+        .args(["context", "--project", "p", "--request", "build the widget", "--plan", "1. A\n2. B"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Context set"));
 
     cmd(&db)
-        .args(["handoff", "--project", proj, "--task", "2", "--session", "sess-xyz", "--note", "A done, B next", "--actor", "claude-code"])
+        .args(["handoff", "--project", "p", "--task", "2", "--session", "sess-xyz", "--note", "A done, B next", "--actor", "claude-code"])
         .assert()
         .success()
         .stdout(predicate::str::contains("stopped at #2"));
 
     cmd(&db)
-        .args(["briefing", "--project", proj])
+        .args(["briefing", "--project", "p"])
         .assert()
         .success()
         .stdout(predicate::str::contains("build the widget"))
@@ -91,7 +98,7 @@ fn cli_context_handoff_briefing() {
 
     // JSON briefing carries the resume task + session id.
     cmd(&db)
-        .args(["briefing", "--project", proj, "--json"])
+        .args(["briefing", "--project", "p", "--json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"resume_task\""))
@@ -105,6 +112,17 @@ fn mcp_server_initialize_and_create() {
     let proj = dir.path().join("p");
     std::fs::create_dir_all(&proj).unwrap();
 
+    // Create a project first so we have a project_id for create_tasks.
+    let create_out = cmd(&db)
+        .args(["create-project", "--path", proj.to_str().unwrap(), "--name", "p", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let project: serde_json::Value = serde_json::from_slice(&create_out).unwrap();
+    let project_id = project["id"].as_i64().unwrap();
+
     let requests = format!(
         concat!(
             r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-06-18","capabilities":{{}},"clientInfo":{{"name":"test","version":"0"}}}}}}"#,
@@ -113,12 +131,12 @@ fn mcp_server_initialize_and_create() {
             "\n",
             r#"{{"jsonrpc":"2.0","id":2,"method":"tools/list"}}"#,
             "\n",
-            r#"{{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{{"name":"create_tasks","arguments":{{"project_path":"{proj}","actor":"test-ai","tasks":[{{"title":"step 1"}},{{"title":"step 2","depends_on":[-1]}}]}}}}}}"#,
+            r#"{{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{{"name":"create_tasks","arguments":{{"project_id":{project_id},"actor":"test-ai","tasks":[{{"title":"step 1"}},{{"title":"step 2","depends_on":[-1]}}]}}}}}}"#,
             "\n",
             r#"{{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{{"name":"list_tasks","arguments":{{}}}}}}"#,
             "\n"
         ),
-        proj = proj.to_str().unwrap().replace('\\', "\\\\")
+        project_id = project_id
     );
 
     let assert = cmd(&db).arg("mcp").write_stdin(requests).assert().success();
