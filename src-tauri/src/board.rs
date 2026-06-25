@@ -119,11 +119,7 @@ pub fn delete_project(project_id: i64) -> Result<(), String> {
 
 #[tauri::command]
 pub fn get_briefing(project_id: i64) -> Result<Briefing, String> {
-    let db = db()?;
-    let project = db
-        .find_project(&project_id.to_string())
-        .map_err(|e| e.to_string())?;
-    db.get_briefing(&project.path).map_err(|e| e.to_string())
+    db()?.get_briefing_by_id(project_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -148,10 +144,7 @@ pub fn update_project_context(
     original_request: String,
     plan_summary: String,
 ) -> Result<Project, String> {
-    let db = db()?;
-    let project = db
-        .find_project(&project_id.to_string())
-        .map_err(|e| e.to_string())?;
-    db.set_project_context(&project.path, &original_request, &plan_summary)
+    db()?
+        .set_project_context_by_id(project_id, &original_request, &plan_summary)
         .map_err(|e| e.to_string())
 }

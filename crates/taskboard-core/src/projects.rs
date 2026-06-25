@@ -173,11 +173,21 @@ impl Db {
         plan_summary: &str,
     ) -> Result<Project> {
         let project = self.ensure_project(path, None)?;
+        self.set_project_context_by_id(project.id, original_request, plan_summary)
+    }
+
+    /// Project-id variant of `set_project_context`.
+    pub fn set_project_context_by_id(
+        &self,
+        project_id: i64,
+        original_request: &str,
+        plan_summary: &str,
+    ) -> Result<Project> {
         self.conn.execute(
             "UPDATE projects SET original_request = ?1, plan_summary = ?2 WHERE id = ?3",
-            params![original_request, plan_summary, project.id],
+            params![original_request, plan_summary, project_id],
         )?;
-        self.find_project(&project.id.to_string())
+        self.find_project(&project_id.to_string())
     }
 
     /// Record where the last AI stopped: the actor, its session id (so the user
@@ -191,11 +201,23 @@ impl Db {
         current_task_id: Option<i64>,
     ) -> Result<Project> {
         let project = self.ensure_project(path, None)?;
+        self.set_handoff_by_id(project.id, actor, session_id, note, current_task_id)
+    }
+
+    /// Project-id variant of `set_handoff`.
+    pub fn set_handoff_by_id(
+        &self,
+        project_id: i64,
+        actor: &str,
+        session_id: &str,
+        note: &str,
+        current_task_id: Option<i64>,
+    ) -> Result<Project> {
         let ts = now();
         self.conn.execute(
             "UPDATE projects SET last_actor = ?1, last_session_id = ?2, handoff_note = ?3, \
              current_task_id = ?4, handoff_updated_at = ?5 WHERE id = ?6",
-            params![actor, session_id, note, current_task_id, ts, project.id],
+            params![actor, session_id, note, current_task_id, ts, project_id],
         )?;
         if let Some(task_id) = current_task_id {
             // Record on the task timeline so the handoff shows up in its activity.
@@ -205,7 +227,7 @@ impl Db {
                 params![task_id, actor, note, ts],
             );
         }
-        self.find_project(&project.id.to_string())
+        self.find_project(&project_id.to_string())
     }
 
     /// Create a new request-project for the given folder. Multiple projects may
@@ -236,6 +258,12 @@ impl Db {
         let project = self
             .find_project_by_path(path)?
             .ok_or_else(|| Error::ProjectNotFound(path.to_string()))?;
+        self.get_briefing_by_id(project.id)
+    }
+
+    /// Project-id variant of `get_briefing`.
+    pub fn get_briefing_by_id(&self, project_id: i64) -> Result<Briefing> {
+        let project = self.find_project(&project_id.to_string())?;
         let tasks = self.list_tasks(&TaskFilter {
             project_id: Some(project.id),
             ..Default::default()
