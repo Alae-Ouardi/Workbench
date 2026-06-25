@@ -8,7 +8,7 @@ const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS projects (
     id                 INTEGER PRIMARY KEY,
     name               TEXT NOT NULL,
-    path               TEXT NOT NULL UNIQUE,
+    path               TEXT NOT NULL,
     created_at         TEXT NOT NULL,
     original_request   TEXT NOT NULL DEFAULT '',
     plan_summary       TEXT NOT NULL DEFAULT '',
@@ -141,6 +141,26 @@ fn migrate(conn: &Connection) -> Result<()> {
         if !existing.contains(name) {
             conn.execute_batch(&format!("ALTER TABLE projects ADD COLUMN {name} {def};"))?;
         }
+    }
+    migrate_remove_path_unique(conn)?;
+    Ok(())
+}
+
+/// Older databases were created with `path TEXT NOT NULL UNIQUE`. Remove that
+/// unique index so multiple request-projects can point to the same folder.
+fn migrate_remove_path_unique(conn: &Connection) -> Result<()> {
+    let mut stmt = conn.prepare(
+        "SELECT name FROM sqlite_master
+         WHERE type = 'index'
+           AND tbl_name = 'projects'
+           AND sql LIKE '%UNIQUE%(%path%)%'",
+    )?;
+    let names: Vec<String> = stmt
+        .query_map([], |row| row.get(0))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    drop(stmt);
+    for name in names {
+        conn.execute(&format!("DROP INDEX IF EXISTS {name}"), [])?;
     }
     Ok(())
 }
