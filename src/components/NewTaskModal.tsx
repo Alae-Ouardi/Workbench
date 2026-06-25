@@ -8,15 +8,12 @@ interface NewTaskModalProps {
   onClose: () => void;
 }
 
-const NEW_PROJECT = "__new__";
-
 export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: NewTaskModalProps) {
   const defaultProject =
     projects.find((p) => p.id === defaultProjectId) ?? projects[0] ?? null;
-  const [projectChoice, setProjectChoice] = useState<string>(
-    defaultProject ? String(defaultProject.id) : NEW_PROJECT,
+  const [projectId, setProjectId] = useState<number | null>(
+    defaultProject?.id ?? null,
   );
-  const [newPath, setNewPath] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [kind, setKind] = useState<Kind>("task");
@@ -25,26 +22,21 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const projectPath =
-    projectChoice === NEW_PROJECT
-      ? newPath.trim()
-      : projects.find((p) => String(p.id) === projectChoice)?.path ?? "";
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) {
       setError("Title is required.");
       return;
     }
-    if (!projectPath) {
-      setError("Choose a project or enter a directory path.");
+    if (projectId === null) {
+      setError("Choose a project.");
       return;
     }
     setSaving(true);
     setError(null);
     try {
       await onSubmit({
-        projectPath,
+        projectId,
         title: title.trim(),
         description: description.trim(),
         kind,
@@ -112,16 +104,15 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
           <div>
             <label className="mb-1 block text-xs text-slate-500">Project</label>
             <select
-              value={projectChoice}
-              onChange={(e) => setProjectChoice(e.target.value)}
+              value={projectId ?? ""}
+              onChange={(e) => setProjectId(Number(e.target.value))}
               className="w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-2 py-2 text-sm outline-none focus:border-sky-600"
             >
               {projects.map((p) => (
-                <option key={p.id} value={String(p.id)}>
+                <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
-              <option value={NEW_PROJECT}>New project (enter path)…</option>
             </select>
           </div>
           <div>
@@ -138,18 +129,6 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
             </select>
           </div>
         </div>
-
-        {projectChoice === NEW_PROJECT && (
-          <>
-            <label className="mb-1 block text-xs text-slate-500">Project directory</label>
-            <input
-              value={newPath}
-              onChange={(e) => setNewPath(e.target.value)}
-              className="mb-3 w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-3 py-2 text-sm outline-none focus:border-sky-600"
-              placeholder="/Users/you/code/my-project"
-            />
-          </>
-        )}
 
         <label className="mb-1 block text-xs text-slate-500">Assignee</label>
         <input

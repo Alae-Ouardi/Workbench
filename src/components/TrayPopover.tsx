@@ -185,7 +185,7 @@ function QuickAdd({ project, onCreated, onCancel }: {
     setSaving(true);
     try {
       await createTask({
-        projectPath: project.path,
+        projectId: project.id,
         title: title.trim(),
         description: description.trim(),
         kind,

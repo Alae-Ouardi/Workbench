@@ -26,7 +26,7 @@ export function getTask(id: number): Promise<TaskDetail> {
 
 export function createTask(input: NewTaskInput): Promise<Task> {
   return invoke("create_task", {
-    projectPath: input.projectPath,
+    projectId: input.projectId,
     title: input.title,
     description: input.description,
     kind: input.kind,

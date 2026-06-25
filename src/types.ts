@@ -91,7 +91,7 @@ export interface Briefing {
 }
 
 export interface NewTaskInput {
-  projectPath: string;
+  projectId: number;
   title: string;
   description: string;
   kind: Kind;
