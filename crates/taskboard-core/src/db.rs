@@ -146,22 +146,40 @@ fn migrate(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-/// Older databases were created with `path TEXT NOT NULL UNIQUE`. Remove that
-/// unique index so multiple request-projects can point to the same folder.
+/// Older databases were created with `path TEXT NOT NULL UNIQUE`. SQLite
+/// cannot drop the auto-index created by an inline UNIQUE constraint, so we
+/// recreate the table without that constraint and copy the data over.
 fn migrate_remove_path_unique(conn: &Connection) -> Result<()> {
-    let mut stmt = conn.prepare(
-        "SELECT name FROM sqlite_master
-         WHERE type = 'index'
-           AND tbl_name = 'projects'
-           AND sql LIKE '%UNIQUE%(%path%)%'",
+    let has_unique: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_index_list('projects') \
+         WHERE \"unique\" = 1 AND name LIKE 'sqlite_autoindex_%'",
+        [],
+        |row| row.get(0),
     )?;
-    let names: Vec<String> = stmt
-        .query_map([], |row| row.get(0))?
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    drop(stmt);
-    for name in names {
-        conn.execute(&format!("DROP INDEX IF EXISTS {name}"), [])?;
+    if has_unique == 0 {
+        return Ok(());
     }
+    // Disable foreign keys so we can drop the old table while tasks reference it.
+    conn.pragma_update(None, "foreign_keys", "OFF")?;
+    conn.execute_batch(
+        "CREATE TABLE projects_new (
+            id                 INTEGER PRIMARY KEY,
+            name               TEXT NOT NULL,
+            path               TEXT NOT NULL,
+            created_at         TEXT NOT NULL,
+            original_request   TEXT NOT NULL DEFAULT '',
+            plan_summary       TEXT NOT NULL DEFAULT '',
+            last_actor         TEXT NOT NULL DEFAULT '',
+            last_session_id    TEXT NOT NULL DEFAULT '',
+            handoff_note       TEXT NOT NULL DEFAULT '',
+            current_task_id    INTEGER,
+            handoff_updated_at TEXT
+        );
+        INSERT INTO projects_new SELECT * FROM projects;
+        DROP TABLE projects;
+        ALTER TABLE projects_new RENAME TO projects;"
+    )?;
+    conn.pragma_update(None, "foreign_keys", "ON")?;
     Ok(())
 }
 

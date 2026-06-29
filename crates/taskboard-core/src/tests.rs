@@ -504,4 +504,7 @@ fn migration_adds_columns_to_legacy_projects_table() {
         .set_project_context("/tmp/old", "legacy request", "legacy plan")
         .unwrap();
     assert_eq!(p.original_request, "legacy request");
+    // The unique-path constraint must have been removed.
+    let p2 = db.create_project("/tmp/old", "old v2", "").unwrap();
+    assert_ne!(p2.id, p.id);
 }
