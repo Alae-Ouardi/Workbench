@@ -1,6 +1,6 @@
 [package]
 name = "taskboard-app"
-version = "0.1.0"
+version = "0.2.0"
 description = "TaskBoard: a task dashboard shared between you and your AI coding tools"
 authors = ["alae"]
 edition = "2021"
