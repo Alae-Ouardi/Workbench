@@ -1,84 +1,84 @@
+<div align="center">
+
 # TaskBoard
 
-A shared kanban board for humans and AI coding agents. TaskBoard runs as a macOS desktop app, a CLI, and an MCP server — all backed by the same local SQLite database so every tool sees the same live state.
+A shared kanban board for humans and AI coding agents.
 
-![TaskBoard main board](docs/screenshot-board.png)
+macOS desktop app · CLI · MCP server — all backed by the same local SQLite database.
+
+![Main Board](docs/screenshot-board.svg)
+
+![Menubar Popover](docs/screenshot-popover.svg)
+
+</div>
+
+---
+
+## What is TaskBoard?
+
+TaskBoard bridges the gap between **you** and your **AI coding assistants**. It's a kanban board where both humans and AI agents create tasks, track progress, and hand off work — all in one place. The AI plans and executes through the MCP or CLI; you observe and steer through the desktop app.
+
+**Key idea:** every request gets its own project with its own context, even if multiple projects point to the same folder. This means you can have "add notifications" and "refactor the database" as separate projects for the same repo, each with isolated tasks and context.
 
 ## Features
 
-- **Kanban board** — columns: `open`, `waiting`, `in_progress`, `review`, `done`
-- **Context banner** — shows the AI's original brief, the approved plan, and the last session ID with a one-click copy (for `claude --resume`)
-- **Handoff system** — AI agents record where they stopped; the next agent reads it via `get_briefing` and resumes at the right task
-- **macOS menubar icon** — compact popover to view active tasks, quick-add, inline edit status/priority/description, and delete tasks without opening the full window
-- **Create projects in-app** — folder picker + title + AI brief; the description is stored as `original_request` and read by AI tools immediately
+### Desktop App
+
+- **Kanban board** — columns for `open`, `waiting`, `in_progress`, `review`, and `done`
+- **Request-based projects** — multiple projects per folder, each with its own context and task list
+- **Context banner** — shows the AI's original brief, approved plan, session ID, and handoff state
+- **Project search** — filter projects by name in the sidebar
+- **Menubar popover** — compact view with filter tabs (All · Waiting · Open · In Progress · Review · Done), task search, quick-add, inline edit, and delete
+- **Sticky "all done" banner** — appears when every task in a project is complete
 - **Embedded terminal** — shell panel scoped to the selected project's directory
-- **MCP server** — AI tools for planning, task tracking, and handoff (works with Claude Code, Codex, OpenCode)
-- **CLI** — `taskboard` binary for scripting and CI
-- **Live sync** — all windows and tools react to changes instantly via Tauri events
+- **Live sync** — all windows and tools react to changes instantly
 
-## Architecture
+### CLI
 
-```
-taskboard/
-├── crates/
-│   ├── taskboard-core/     # Rust lib: SQLite schema, all DB logic
-│   └── taskboard-cli/      # Binary: CLI subcommands + MCP server (stdio)
-├── src-tauri/              # Tauri 2 app shell (Rust)
-├── src/                    # React + TypeScript frontend (Vite)
-│   └── components/
-│       ├── Board.tsx        # Kanban columns
-│       ├── ContextBanner.tsx
-│       ├── TrayPopover.tsx  # Menubar popover window
-│       ├── Sidebar.tsx
-│       ├── TaskDrawer.tsx
-│       ├── NewProjectModal.tsx
-│       └── Terminal.tsx
-└── ~/.taskboard/
-    └── taskboard.db        # Shared SQLite DB (WAL mode)
-```
+- Create projects, tasks, and bugs
+- Set context and handoff state
+- List, move, update, and search tasks
+- Works in any terminal — no app required
 
-The CLI binary and the desktop app share the same database at `~/.taskboard/taskboard.db`. The `taskboard mcp` subcommand runs the MCP server over stdio, exposing tools to AI coding assistants.
+### MCP Server
 
-## Requirements
+- Full tool suite for AI agents: plan, create, track, hand off
+- Works with Claude Code, Codex, OpenCode, and any MCP-compatible client
+- AI agents see the same board you do
 
-- **macOS** (Tauri 2 with `tray-icon` feature)
+## Quick Start
+
+### Prerequisites
+
+- **macOS** (Tauri 2 with menubar support)
 - **Rust** — [rustup.rs](https://rustup.rs)
 - **Node.js ≥ 18** + **pnpm**
 
-## Getting Started
-
-### 1. Install dependencies
+### Build & Install
 
 ```bash
+git clone https://github.com/YOUR_USERNAME/taskboard.git
+cd taskboard
+
+# Install dependencies
 pnpm install
-```
 
-### 2. Development mode
-
-```bash
-pnpm tauri dev
-```
-
-### 3. Production build
-
-```bash
+# Build the desktop app + CLI
 pnpm tauri build
+cargo build -p taskboard-cli --release
+
+# Install the CLI
+cp target/release/taskboard /usr/local/bin/taskboard
+
+# Install the app
+cp -R target/release/bundle/macos/TaskBoard.app /Applications/
 ```
 
-Outputs:
-- `target/release/bundle/macos/TaskBoard.app`
-- `target/release/bundle/dmg/TaskBoard_0.1.0_aarch64.dmg`
+### Connect Your AI Agent
 
-### 4. Install the CLI
+Add TaskBoard as an MCP server in your AI tool's config:
 
-```bash
-sudo cp target/release/taskboard /usr/local/bin/taskboard
-```
-
-### 5. Connect to Claude Code (MCP)
-
-Add to your `~/.claude/mcp_servers.json` (or project-level `.claude/mcp_servers.json`):
-
+**Claude Code** (`~/.claude/mcp_servers.json`):
 ```json
 {
   "mcpServers": {
@@ -90,89 +90,145 @@ Add to your `~/.claude/mcp_servers.json` (or project-level `.claude/mcp_servers.
 }
 ```
 
-## CLI Usage
-
-```bash
-# List projects
-taskboard projects
-
-# Add a task
-taskboard add --project /path/to/project "Implement login flow"
-
-# Move a task
-taskboard move 12 in_progress
-
-# Show the AI briefing for a project
-taskboard briefing --project /path/to/project
-
-# Record a handoff (AI saves where it stopped)
-taskboard handoff --project /path/to/project \
-  --session "your-session-id" \
-  --task 12 \
-  --note "Finished auth middleware. Next: write tests."
-
-# Set project context (original request + plan)
-taskboard context --project /path/to/project \
-  --request "Build a login system with OAuth" \
-  --plan "Phase 1: schema; Phase 2: endpoints; Phase 3: frontend"
+**OpenCode** (`opencode.json`):
+```json
+{
+  "mcp": {
+    "taskboard": {
+      "type": "local",
+      "command": ["taskboard", "mcp"]
+    }
+  }
+}
 ```
 
-## MCP Tools (for AI agents)
+That's it — your AI agent can now plan tasks, track progress, and hand off work on TaskBoard.
 
-| Tool | Description |
-|------|-------------|
-| `get_briefing` | Returns the original request, approved plan, handoff state, and the task to resume |
-| `create_tasks` | Create a list of tasks with dependencies, priorities, and assignees |
-| `update_task_status` | Move a task to `open`, `in_progress`, `review`, or `done` |
-| `save_handoff` | Record where the AI stopped (session ID, task, note) |
-| `set_project_context` | Store the original request and plan summary |
-| `list_tasks` | List tasks filtered by project/status/assignee |
-| `get_task` | Full task detail including comments and activity |
-| `update_task` | Edit title, description, priority, assignee |
-| `delete_task` | Delete a task |
-| `add_task_comment` | Add a handoff note or comment to a task |
-| `set_task_dependencies` | Wire up task dependencies |
-| `list_projects` | List all projects with task counts |
-| `delete_project` | Delete a project and all its tasks |
+## How to Use
 
-## AI Workflow
+### From the App
 
-The intended flow for AI coding agents:
+1. Click **+ New** in the sidebar to create a project — pick a folder, give it a name, and describe what you want built (the AI reads this as its brief).
+2. Create tasks manually with **+ New task**, or let an AI agent plan tasks for you via the CLI/MCP.
+3. The **Context banner** shows the original request, approved plan, and where the last AI session stopped.
+4. Use the **menubar icon** for a quick glance at tasks without opening the full window.
 
-1. **Start of session** — call `get_briefing(project_path)` to read the north-star context and resume at the right task
-2. **Before coding** — call `update_task_status(id, "in_progress")`
-3. **After coding** — call `update_task_status(id, "done")`
-4. **End of session / before stopping** — call `save_handoff(...)` with the session ID so the next agent can resume
+### From the CLI
 
-The desktop app and CLI show everything the AI writes in real time.
+```bash
+# Create a new request-project
+taskboard create-project --path /path/to/repo --name "Add notifications" \
+  --description "Add sticky notification when all tasks are done"
 
-## Task Statuses
+# Add a task to it
+taskboard add --project "Add notifications" "Write integration tests" --priority high
 
-| Status | Meaning |
-|--------|---------|
-| `open` | Ready to start |
-| `waiting` | Blocked by an unfinished dependency |
-| `in_progress` | Being worked on |
-| `review` | Awaiting human review |
-| `done` | Fully completed |
+# Move a task
+taskboard move 42 in_progress
 
-Marking a task `done` automatically promotes any `waiting` tasks whose dependencies are now satisfied.
+# See the briefing (context + handoff + resume task)
+taskboard briefing --project "Add notifications"
 
-## Database
+# Record a handoff
+taskboard handoff --project "Add notifications" \
+  --session "abc-123" --task 42 \
+  --note "Backend done. Next: write integration tests."
+```
 
-The SQLite database lives at `~/.taskboard/taskboard.db` and is shared by the app, CLI, and MCP server. It uses WAL mode for concurrent access. Foreign key cascades ensure project deletion removes all associated tasks, comments, events, and dependencies.
+### From Your AI Agent
 
-Override the path with the `TASKBOARD_DB` environment variable.
+Give your AI agent this prompt:
+
+> You have a TaskBoard MCP server with the following tools. Use them for every project:
+>
+> 1. **`get_briefing`** — call this FIRST when you start work on a project. It returns the original request, the approved plan, where the last AI stopped, and the task you should resume on.
+> 2. **`create_project`** — create a new request-project for a folder. Each request should be its own project, even if it points to the same folder as an existing project.
+> 3. **`set_project_context`** — call this right after the user approves your plan. Store the user's verbatim original request and a short summary of the approved plan.
+> 4. **`create_tasks`** — break the plan into small, verifiable tasks and create them all at once before starting execution. Use `depends_on` with negative indexes to chain sequential tasks.
+> 5. **`update_task_status`** — move a task to `in_progress` before you start working on it, and `done` when finished. Marking a task done auto-promotes waiting tasks whose dependencies are satisfied.
+> 6. **`save_handoff`** — call this after each phase and before you stop. Record the task you're on, a short note on what's done and what's next, and your session ID so the user can resume this exact session later.
+> 7. **`list_projects`** — list all projects if you need to find a project ID.
+>
+> **Lifecycle for every task:** `in_progress` → do the work → `done`. Never skip marking tasks. The board stays accurate for the next agent.
+
+## MCP Tools Reference
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `create_project` | `path`, `name`, `description` | Create a new request-project for a folder |
+| `list_projects` | — | List all projects with per-status task counts |
+| `create_tasks` | `project_id`, `tasks[]`, `actor` | Create one or more tasks with dependencies, priorities, assignees |
+| `list_tasks` | `project?`, `status?`, `assignee?` | List tasks, optionally filtered |
+| `get_task` | `id` | Full task detail: description, dependencies, comments, activity |
+| `update_task_status` | `id`, `status`, `actor` | Move a task (auto-promotes waiting tasks when done) |
+| `update_task` | `id`, `title?`, `description?`, `assignee?`, `priority?` | Edit task fields |
+| `set_task_dependencies` | `id`, `depends_on[]`, `actor` | Replace a task's dependency set |
+| `add_task_comment` | `id`, `author`, `body` | Add a handoff note or comment |
+| `delete_task` | `id` | Delete a task permanently |
+| `get_briefing` | `project_id` | Returns context, handoff state, resume task, and full task list |
+| `set_project_context` | `project_id`, `original_request`, `plan_summary` | Store the north-star context |
+| `save_handoff` | `project_id`, `actor`, `session_id`, `note`, `current_task_id` | Record where you stopped |
+| `delete_project` | `project_id` | Delete a project and all its tasks |
+
+## Architecture
+
+```
+taskboard/
+├── crates/
+│   ├── taskboard-core/        # Rust lib: SQLite schema, all DB logic
+│   └── taskboard-cli/         # Binary: CLI subcommands + MCP server (stdio)
+├── src-tauri/                 # Tauri 2 app shell (Rust)
+├── src/                       # React + TypeScript frontend (Vite)
+│   └── components/
+│       ├── Board.tsx           # Kanban columns
+│       ├── ContextBanner.tsx   # Project context + handoff display
+│       ├── TrayPopover.tsx     # Menubar popover window
+│       ├── Sidebar.tsx         # Project list + search
+│       ├── TaskDrawer.tsx      # Task detail panel
+│       ├── NewProjectModal.tsx # Project creation
+│       └── Terminal.tsx        # Embedded terminal
+└── ~/.taskboard/
+    └── taskboard.db            # Shared SQLite DB (WAL mode)
+```
+
+The desktop app, CLI, and MCP server all read and write to the same SQLite database at `~/.taskboard/taskboard.db`. WAL mode enables safe concurrent access from multiple processes.
 
 ## Tech Stack
 
-- **Rust** — core library, CLI, MCP server, Tauri backend
-- **Tauri 2** — macOS desktop app with multi-window support (main board + menubar popover)
-- **React 18 + TypeScript** — frontend
-- **Tailwind CSS** — styling
-- **Vite** — frontend build
-- **SQLite (rusqlite)** — local database
-- **clap** — CLI argument parsing
+| Layer | Technology |
+|-------|-----------|
+| Core library | Rust, rusqlite (SQLite), thiserror |
+| Desktop app | Tauri 2, React 19, TypeScript, Tailwind CSS, Vite |
+| CLI | Rust, clap |
+| MCP server | Rust, serde_json (stdio JSON-RPC) |
+| Database | SQLite (WAL mode, foreign key cascades) |
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run in development mode (hot reload)
+pnpm tauri dev
+
+# Run tests
+cargo test --workspace
+
+# Type-check frontend
+pnpm tsc --noEmit
+
+# Production build
+pnpm tauri build
+cargo build -p taskboard-cli --release
+```
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TASKBOARD_DB` | `~/.taskboard/taskboard.db` | Path to the SQLite database |
+| `TASKBOARD_ACTOR` | `cli` | Default actor name for CLI actions |
 
 ## License
 
