@@ -37,7 +37,7 @@ export function TrayPopover() {
   const [showAdd, setShowAdd] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
-  const [sortReversed, setSortReversed] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
   const unlistenRef = useRef<(() => void) | null>(null);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? null;
@@ -79,10 +79,12 @@ export function TrayPopover() {
     done: 4,
   };
   const defaultSorted = [...activeTasks].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
+  const filtered = statusFilter === "all"
+    ? defaultSorted
+    : defaultSorted.filter((t) => t.status === statusFilter);
   const searched = query.trim()
-    ? defaultSorted.filter((t) => t.title.toLowerCase().includes(query.trim().toLowerCase()))
-    : defaultSorted;
-  const sorted = sortReversed ? [...searched].reverse() : searched;
+    ? filtered.filter((t) => t.title.toLowerCase().includes(query.trim().toLowerCase()))
+    : filtered;
 
   return (
     <div className="flex h-screen flex-col bg-[#0d1018] text-slate-300">
@@ -146,26 +148,37 @@ export function TrayPopover() {
         />
       )}
 
-      <div className="shrink-0 flex items-center gap-2 border-b border-white/[0.06] px-3 py-2">
+      <div className="shrink-0 border-b border-white/[0.06] px-3 py-2">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tasks…"
-          className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[11px] text-slate-300 outline-none placeholder:text-slate-700 focus:border-sky-500/40"
+          className="mb-2 w-full rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[11px] text-slate-300 outline-none placeholder:text-slate-700 focus:border-sky-500/40"
         />
-        <button
-          onClick={() => setSortReversed((r) => !r)}
-          title={sortReversed ? "Sorting: done → waiting" : "Sorting: waiting → done"}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white/[0.06] hover:text-slate-300"
-        >
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" className={sortReversed ? "rotate-180 transition-transform" : "transition-transform"}>
-            <path d="M3 4h7M3 8h4M3 12h10M10 2l2 2-2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+        <div className="flex gap-1 overflow-x-auto">
+          {(["all", ...(["waiting", "open", "in_progress", "review", "done"] as const)] as const).map((s) => {
+            const active = statusFilter === s;
+            const cfg = s === "all" ? { label: "All", dot: "bg-slate-500", bg: "bg-slate-500/15 text-slate-300" } : STATUS_CONFIG[s];
+            return (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
+                  active
+                    ? cfg.bg
+                    : "text-slate-600 hover:bg-white/[0.04] hover:text-slate-400"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                {cfg.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {sorted.length === 0 ? (
+        {searched.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 py-16">
             <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.03]">
               <svg width="20" height="20" viewBox="0 0 16 16" fill="none" className="text-slate-600">
@@ -178,7 +191,7 @@ export function TrayPopover() {
           </div>
         ) : (
           <div className="p-2">
-            {sorted.map((task) => (
+            {searched.map((task) => (
               <TaskRow
                 key={task.id}
                 task={task}
@@ -194,7 +207,7 @@ export function TrayPopover() {
       <div className="flex shrink-0 items-center justify-between border-t border-white/[0.04] px-4 py-1.5">
         <span className="text-[10px] text-slate-700">v{packageJson.version}</span>
         <span className="text-[10px] text-slate-700">
-          {sorted.length} {sorted.length === 1 ? "task" : "tasks"}
+          {searched.length} {searched.length === 1 ? "task" : "tasks"}
         </span>
       </div>
     </div>

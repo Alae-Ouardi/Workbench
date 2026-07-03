@@ -3931,7 +3931,7 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "taskboard-app"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "notify",
  "notify-debouncer-mini",
@@ -3948,7 +3948,7 @@ dependencies = [
 
 [[package]]
 name = "taskboard-cli"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3961,7 +3961,7 @@ dependencies = [
 
 [[package]]
 name = "taskboard-core"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
