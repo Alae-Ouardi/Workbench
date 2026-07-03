@@ -46,7 +46,7 @@ export function TrayPopover() {
       listTasks(selectedProjectId),
     ]);
     setProjects(ps);
-    setTasks(ts.filter((t) => t.status !== "done"));
+    setTasks(ts);
     if (selectedProjectId === null && ps.length > 0) {
       setSelectedProjectId(ps[0].id);
     }

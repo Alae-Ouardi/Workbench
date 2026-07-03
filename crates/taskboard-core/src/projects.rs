@@ -149,7 +149,7 @@ impl Db {
              FROM projects p
              LEFT JOIN tasks t ON t.project_id = p.id
              GROUP BY p.id
-             ORDER BY p.name COLLATE NOCASE"
+             ORDER BY p.id DESC"
         ))?;
         let rows = stmt.query_map([], |row| {
             Ok(ProjectSummary {

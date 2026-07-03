@@ -12,6 +12,7 @@ interface SidebarProps {
 
 export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNewProject }: SidebarProps) {
   const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
 
   const totalActive = projects.reduce(
     (sum, p) => sum + p.open + p.waiting + p.in_progress + p.review,
@@ -19,6 +20,10 @@ export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNew
   );
 
   const confirmProject = confirmId !== null ? projects.find((p) => p.id === confirmId) : null;
+
+  const filtered = query.trim()
+    ? projects.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : projects;
 
   function handleDeleteClick(id: number) {
     setConfirmId(id);
@@ -56,7 +61,13 @@ export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNew
             + New
           </button>
         </div>
-        {projects.map((p) => (
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search projects…"
+          className="mb-2 mx-2 w-auto rounded-md border border-[#2a3040] bg-[#0b0e14] px-2 py-1 text-xs text-slate-300 outline-none placeholder:text-slate-700 focus:border-sky-600"
+        />
+        {filtered.map((p) => (
           <SidebarItem
             key={p.id}
             label={p.name}
@@ -68,9 +79,11 @@ export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNew
             title={p.path}
           />
         ))}
-        {projects.length === 0 && (
+        {filtered.length === 0 && (
           <p className="px-2 py-2 text-xs leading-relaxed text-slate-600">
-            No projects yet. Create a task here, or let an AI plan one from its CLI.
+            {projects.length === 0
+              ? "No projects yet. Create a task here, or let an AI plan one from its CLI."
+              : "No projects match your search."}
           </p>
         )}
       </nav>
