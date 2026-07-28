@@ -6,12 +6,14 @@ mod db;
 mod error;
 mod projects;
 mod tasks;
+pub mod tp;
 mod types;
 
 pub use db::Db;
 pub use error::{Error, Result};
 pub use projects::resolve_project_root;
 pub use tasks::TaskUpdate;
+pub use tp::{SyncQueueItem, SyncReport, TpSettings, TpUser, TpUserStory};
 pub use types::{
     Briefing, Comment, Event, Kind, NewTask, Priority, Project, ProjectSummary, Status,
     StatusChange, Task, TaskDetail, TaskFilter, TaskRef,

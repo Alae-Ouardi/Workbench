@@ -21,7 +21,15 @@ fn cli_round_trip() {
         .success();
 
     cmd(&db)
-        .args(["add", "First task", "--project", "myproj", "--bug", "--priority", "high"])
+        .args([
+            "add",
+            "First task",
+            "--project",
+            "myproj",
+            "--bug",
+            "--priority",
+            "high",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("Created #1 [open] First task"));
@@ -40,7 +48,13 @@ fn cli_round_trip() {
         .stdout(predicate::str::contains("#1 -> in_progress"));
 
     cmd(&db)
-        .args(["comment", "1", "handoff: half done", "--actor", "claude-code"])
+        .args([
+            "comment",
+            "1",
+            "handoff: half done",
+            "--actor",
+            "claude-code",
+        ])
         .assert()
         .success();
 
@@ -58,9 +72,11 @@ fn cli_round_trip() {
         .failure()
         .stderr(predicate::str::contains("invalid status"));
 
-    cmd(&db).args(["projects"]).assert().success().stdout(
-        predicate::str::contains("myproj"),
-    );
+    cmd(&db)
+        .args(["projects"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("myproj"));
 }
 
 #[test]
@@ -71,19 +87,48 @@ fn cli_context_handoff_briefing() {
     std::fs::create_dir_all(&proj).unwrap();
     let proj = proj.to_str().unwrap();
 
-    cmd(&db).args(["create-project", "--path", proj, "--name", "p"]).assert().success();
-
-    cmd(&db).args(["add", "Task A", "--project", "p"]).assert().success();
-    cmd(&db).args(["add", "Task B", "--project", "p"]).assert().success();
+    cmd(&db)
+        .args(["create-project", "--path", proj, "--name", "p"])
+        .assert()
+        .success();
 
     cmd(&db)
-        .args(["context", "--project", "p", "--request", "build the widget", "--plan", "1. A\n2. B"])
+        .args(["add", "Task A", "--project", "p"])
+        .assert()
+        .success();
+    cmd(&db)
+        .args(["add", "Task B", "--project", "p"])
+        .assert()
+        .success();
+
+    cmd(&db)
+        .args([
+            "context",
+            "--project",
+            "p",
+            "--request",
+            "build the widget",
+            "--plan",
+            "1. A\n2. B",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("Context set"));
 
     cmd(&db)
-        .args(["handoff", "--project", "p", "--task", "2", "--session", "sess-xyz", "--note", "A done, B next", "--actor", "claude-code"])
+        .args([
+            "handoff",
+            "--project",
+            "p",
+            "--task",
+            "2",
+            "--session",
+            "sess-xyz",
+            "--note",
+            "A done, B next",
+            "--actor",
+            "claude-code",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("stopped at #2"));
@@ -102,7 +147,9 @@ fn cli_context_handoff_briefing() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"resume_task\""))
-        .stdout(predicate::str::contains("\"last_session_id\": \"sess-xyz\""));
+        .stdout(predicate::str::contains(
+            "\"last_session_id\": \"sess-xyz\"",
+        ));
 }
 
 #[test]
@@ -114,7 +161,14 @@ fn mcp_server_initialize_and_create() {
 
     // Create a project first so we have a project_id for create_tasks.
     let create_out = cmd(&db)
-        .args(["create-project", "--path", proj.to_str().unwrap(), "--name", "p", "--json"])
+        .args([
+            "create-project",
+            "--path",
+            proj.to_str().unwrap(),
+            "--name",
+            "p",
+            "--json",
+        ])
         .assert()
         .success()
         .get_output()
@@ -160,7 +214,10 @@ fn mcp_server_initialize_and_create() {
 
     let created: serde_json::Value = serde_json::from_str(lines[2]).unwrap();
     let text = created["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(created["result"]["isError"].is_null(), "create failed: {text}");
+    assert!(
+        created["result"]["isError"].is_null(),
+        "create failed: {text}"
+    );
     let tasks: serde_json::Value = serde_json::from_str(text).unwrap();
     assert_eq!(tasks.as_array().unwrap().len(), 2);
     assert_eq!(tasks[0]["status"], "open");

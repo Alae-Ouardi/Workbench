@@ -3,11 +3,11 @@
 
 use std::str::FromStr;
 
-use tauri::{AppHandle, Manager};
 use taskboard_core::{
     Briefing, Comment, Db, Kind, NewTask, Priority, Project, ProjectSummary, Status, StatusChange,
     Task, TaskDetail, TaskFilter, TaskUpdate,
 };
+use tauri::{AppHandle, Manager};
 
 const APP_ACTOR: &str = "me";
 
@@ -47,6 +47,7 @@ pub fn create_task(
     kind: String,
     priority: String,
     assignee: String,
+    estimate_points: Option<f64>,
 ) -> Result<Task, String> {
     let new = NewTask {
         title,
@@ -55,6 +56,7 @@ pub fn create_task(
         kind: Some(Kind::from_str(&kind).map_err(|e| e.to_string())?),
         priority: Some(Priority::from_str(&priority).map_err(|e| e.to_string())?),
         depends_on: Vec::new(),
+        estimate_points,
     };
     db()?
         .create_task(project_id, &new, APP_ACTOR)
@@ -76,6 +78,7 @@ pub fn update_task(
     description: Option<String>,
     assignee: Option<String>,
     priority: Option<String>,
+    estimate_points: Option<f64>,
 ) -> Result<Task, String> {
     let update = TaskUpdate {
         title,
@@ -87,6 +90,7 @@ pub fn update_task(
             .transpose()
             .map_err(|e| e.to_string())?,
         position: None,
+        estimate_points,
     };
     db()?
         .update_task(id, &update, APP_ACTOR)
@@ -119,7 +123,9 @@ pub fn delete_project(project_id: i64) -> Result<(), String> {
 
 #[tauri::command]
 pub fn get_briefing(project_id: i64) -> Result<Briefing, String> {
-    db()?.get_briefing_by_id(project_id).map_err(|e| e.to_string())
+    db()?
+        .get_briefing_by_id(project_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

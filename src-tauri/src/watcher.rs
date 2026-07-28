@@ -10,8 +10,8 @@
 use std::time::Duration;
 
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
-use tauri::{AppHandle, Emitter};
 use taskboard_core::Db;
+use tauri::{AppHandle, Emitter};
 
 use crate::notifications::TaskSnapshot;
 

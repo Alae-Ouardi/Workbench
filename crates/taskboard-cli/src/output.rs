@@ -26,7 +26,10 @@ pub fn print_briefing(b: &Briefing) {
             println!("  stopped at:  #{id}");
         }
         if !p.handoff_note.is_empty() {
-            println!("  note:        {}", p.handoff_note.replace('\n', "\n               "));
+            println!(
+                "  note:        {}",
+                p.handoff_note.replace('\n', "\n               ")
+            );
         }
         if let Some(ts) = &p.handoff_updated_at {
             println!("  updated:     {ts}");
@@ -96,7 +99,11 @@ pub fn print_detail(d: &TaskDetail) {
         t.project_name,
         t.kind,
         t.priority,
-        if t.assignee.is_empty() { "-" } else { &t.assignee }
+        if t.assignee.is_empty() {
+            "-"
+        } else {
+            &t.assignee
+        }
     );
     println!("created: {}   updated: {}", t.created_at, t.updated_at);
     if !t.description.is_empty() {
@@ -117,7 +124,12 @@ pub fn print_detail(d: &TaskDetail) {
     if !d.comments.is_empty() {
         println!("\ncomments:");
         for c in &d.comments {
-            println!("  [{}] {}:\n    {}", c.created_at, c.author, c.body.replace('\n', "\n    "));
+            println!(
+                "  [{}] {}:\n    {}",
+                c.created_at,
+                c.author,
+                c.body.replace('\n', "\n    ")
+            );
         }
     }
     if !d.events.is_empty() {

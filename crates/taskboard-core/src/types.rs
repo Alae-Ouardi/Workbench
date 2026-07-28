@@ -150,6 +150,16 @@ pub struct Project {
     pub current_task_id: Option<i64>,
     /// When the handoff state last changed.
     pub handoff_updated_at: Option<String>,
+    /// TargetProcess user story this project's tasks are created under.
+    pub tp_user_story_id: Option<i64>,
+    /// Cached user story name, so the UI can label the link without a round trip.
+    pub tp_user_story_name: String,
+    /// TargetProcess project id owning the story — required when creating entities.
+    pub tp_project_id: Option<i64>,
+    /// TargetProcess process id — required to resolve workflow states.
+    pub tp_process_id: Option<i64>,
+    /// Whether changes to this project are pushed to TargetProcess.
+    pub tp_sync_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -177,6 +187,19 @@ pub struct Task {
     pub position: f64,
     pub created_at: String,
     pub updated_at: String,
+    /// Id of the mirrored TargetProcess entity, once it has been created.
+    pub tp_entity_id: Option<i64>,
+    /// TargetProcess entity type: `Task` or `Bug`.
+    pub tp_entity_type: String,
+    /// Simulated human effort in points, where 1 point = 1 hour. Logged to
+    /// TargetProcess as `Spent` when the task is completed.
+    pub estimate_points: f64,
+    /// `none` | `pending` | `synced` | `error`.
+    pub tp_sync_state: String,
+    /// Last TargetProcess error for this task, if `tp_sync_state` is `error`.
+    pub tp_sync_error: String,
+    /// Hours already logged to TargetProcess. Guards against double-logging.
+    pub tp_time_logged: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -244,6 +267,9 @@ pub struct NewTask {
     /// IDs of tasks this task depends on.
     #[serde(default)]
     pub depends_on: Vec<i64>,
+    /// Simulated human effort in points (1 point = 1 hour, 0.5 = 30 min).
+    #[serde(default)]
+    pub estimate_points: Option<f64>,
 }
 
 /// Filter for listing tasks.

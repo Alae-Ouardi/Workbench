@@ -8,7 +8,12 @@ use crate::types::{Briefing, Project, ProjectSummary, Status, Task, TaskFilter};
 
 /// All `projects` columns, in the order `row_to_project` expects them.
 const PROJECT_COLUMNS: &str = "id, name, path, created_at, original_request, plan_summary, \
-     last_actor, last_session_id, handoff_note, current_task_id, handoff_updated_at";
+     last_actor, last_session_id, handoff_note, current_task_id, handoff_updated_at, \
+     tp_user_story_id, tp_user_story_name, tp_project_id, tp_process_id, tp_sync_enabled";
+
+/// Number of columns in `PROJECT_COLUMNS`, i.e. the first free index for extra
+/// selected expressions in queries that append to it.
+const PROJECT_COLUMN_COUNT: usize = 16;
 
 /// Resolve a filesystem path to a canonical project root: the enclosing git
 /// repository root if one exists, otherwise the canonicalized path itself.
@@ -51,20 +56,21 @@ impl Db {
             "INSERT INTO projects (name, path, created_at) VALUES (?1, ?2, ?3)",
             params![name, root, created_at],
         )?;
-        let id = self.conn.last_insert_rowid();
-        Ok(Project {
-            id,
-            name,
-            path: root,
-            created_at,
-            original_request: String::new(),
-            plan_summary: String::new(),
-            last_actor: String::new(),
-            last_session_id: String::new(),
-            handoff_note: String::new(),
-            current_task_id: None,
-            handoff_updated_at: None,
-        })
+        // Read the row back rather than reconstructing it, so column defaults
+        // live only in the schema.
+        self.project_by_id(self.conn.last_insert_rowid())
+    }
+
+    /// Look up a project by its id.
+    pub fn project_by_id(&self, id: i64) -> Result<Project> {
+        self.conn
+            .query_row(
+                &format!("SELECT {PROJECT_COLUMNS} FROM projects WHERE id = ?1"),
+                params![id],
+                row_to_project,
+            )
+            .optional()?
+            .ok_or(Error::ProjectNotFound(id.to_string()))
     }
 
     /// Look up a single project by path. Errors if multiple projects share this
@@ -113,9 +119,9 @@ impl Db {
             return Ok(p);
         }
         let mut by_name: Vec<Project> = {
-            let mut stmt = self
-                .conn
-                .prepare(&format!("SELECT {PROJECT_COLUMNS} FROM projects WHERE name = ?1"))?;
+            let mut stmt = self.conn.prepare(&format!(
+                "SELECT {PROJECT_COLUMNS} FROM projects WHERE name = ?1"
+            ))?;
             let rows = stmt.query_map(params![key], row_to_project)?;
             rows.collect::<std::result::Result<Vec<_>, _>>()?
         };
@@ -133,12 +139,14 @@ impl Db {
     }
 
     pub fn list_projects(&self) -> Result<Vec<ProjectSummary>> {
-        // Project columns first (indices 0..=10), then the five status counts.
+        // All project columns first, then the five status counts — so the counts
+        // start at `PROJECT_COLUMN_COUNT` rather than a hardcoded index.
         let prefixed: String = PROJECT_COLUMNS
             .split(", ")
             .map(|c| format!("p.{c}"))
             .collect::<Vec<_>>()
             .join(", ");
+        let n = PROJECT_COLUMN_COUNT;
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {prefixed},
                     SUM(CASE WHEN t.status = 'open' THEN 1 ELSE 0 END),
@@ -154,11 +162,11 @@ impl Db {
         let rows = stmt.query_map([], |row| {
             Ok(ProjectSummary {
                 project: row_to_project(row)?,
-                open: row.get::<_, Option<i64>>(11)?.unwrap_or(0),
-                waiting: row.get::<_, Option<i64>>(12)?.unwrap_or(0),
-                in_progress: row.get::<_, Option<i64>>(13)?.unwrap_or(0),
-                review: row.get::<_, Option<i64>>(14)?.unwrap_or(0),
-                done: row.get::<_, Option<i64>>(15)?.unwrap_or(0),
+                open: row.get::<_, Option<i64>>(n)?.unwrap_or(0),
+                waiting: row.get::<_, Option<i64>>(n + 1)?.unwrap_or(0),
+                in_progress: row.get::<_, Option<i64>>(n + 2)?.unwrap_or(0),
+                review: row.get::<_, Option<i64>>(n + 3)?.unwrap_or(0),
+                done: row.get::<_, Option<i64>>(n + 4)?.unwrap_or(0),
             })
         })?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
@@ -245,7 +253,9 @@ impl Db {
 
     /// Delete a project and all its tasks, comments, and history (cascades via FK).
     pub fn delete_project(&self, id: i64) -> Result<()> {
-        let rows = self.conn.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+        let rows = self
+            .conn
+            .execute("DELETE FROM projects WHERE id = ?1", params![id])?;
         if rows == 0 {
             Err(Error::ProjectNotFound(id.to_string()))
         } else {
@@ -310,5 +320,10 @@ fn row_to_project(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
         handoff_note: row.get(8)?,
         current_task_id: row.get(9)?,
         handoff_updated_at: row.get(10)?,
+        tp_user_story_id: row.get(11)?,
+        tp_user_story_name: row.get(12)?,
+        tp_project_id: row.get(13)?,
+        tp_process_id: row.get(14)?,
+        tp_sync_enabled: row.get(15)?,
     })
 }

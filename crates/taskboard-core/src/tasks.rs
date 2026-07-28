@@ -10,7 +10,9 @@ use crate::types::{
 };
 
 const TASK_COLUMNS: &str = "t.id, t.project_id, p.name, t.title, t.description, t.status, \
-     t.kind, t.assignee, t.priority, t.position, t.created_at, t.updated_at";
+     t.kind, t.assignee, t.priority, t.position, t.created_at, t.updated_at, \
+     t.tp_entity_id, t.tp_entity_type, t.estimate_points, t.tp_sync_state, \
+     t.tp_sync_error, t.tp_time_logged";
 
 /// Optional field updates for an existing task.
 #[derive(Debug, Clone, Default)]
@@ -20,6 +22,7 @@ pub struct TaskUpdate {
     pub assignee: Option<String>,
     pub priority: Option<Priority>,
     pub position: Option<f64>,
+    pub estimate_points: Option<f64>,
 }
 
 impl Db {
@@ -73,10 +76,11 @@ impl Db {
         let ts = now();
         let priority = new.priority.unwrap_or(Priority::Normal);
         let kind = new.kind.unwrap_or(Kind::Task);
+        let estimate = new.estimate_points.unwrap_or(0.0).max(0.0);
         self.conn.execute(
-            "INSERT INTO tasks (project_id, title, description, status, kind, assignee, priority, position, created_at, updated_at)
-             VALUES (?1, ?2, ?3, 'open', ?4, ?5, ?6, 0, ?7, ?7)",
-            params![project_id, new.title, new.description, kind.as_str(), new.assignee, priority.as_str(), ts],
+            "INSERT INTO tasks (project_id, title, description, status, kind, assignee, priority, position, created_at, updated_at, tp_entity_type, estimate_points)
+             VALUES (?1, ?2, ?3, 'open', ?4, ?5, ?6, 0, ?7, ?7, ?8, ?9)",
+            params![project_id, new.title, new.description, kind.as_str(), new.assignee, priority.as_str(), ts, tp_entity_type(kind), estimate],
         )?;
         let id = self.conn.last_insert_rowid();
         self.conn.execute(
@@ -87,7 +91,42 @@ impl Db {
         if !new.depends_on.is_empty() {
             self.replace_dependencies(id, &new.depends_on, actor)?;
         }
+        self.enqueue_tp_create(project_id, id)?;
         self.get_task_row(id)
+    }
+
+    /// The linked project to mirror changes to, or `None` when this project is
+    /// not connected to TargetProcess.
+    ///
+    /// Deliberately decided from the database alone. Queueing records *what
+    /// happened*; whether and how to push it — the master switch, the state-name
+    /// mapping — is settings, applied when the queue is drained. That keeps the
+    /// write path free of file I/O and makes it deterministic in tests.
+    fn tp_target(&self, project_id: i64) -> Result<Option<crate::types::Project>> {
+        let project = self.project_by_id(project_id)?;
+        if project.tp_user_story_id.is_none() || !project.tp_sync_enabled {
+            return Ok(None);
+        }
+        Ok(Some(project))
+    }
+
+    /// Mirror a new task into TargetProcess, if its project is linked. Runs in
+    /// the caller's transaction, so a rolled-back task takes its queue row with
+    /// it.
+    fn enqueue_tp_create(&self, project_id: i64, task_id: i64) -> Result<()> {
+        let Some(project) = self.tp_target(project_id)? else {
+            return Ok(());
+        };
+        let Some(user_story_id) = project.tp_user_story_id else {
+            return Ok(());
+        };
+        self.enqueue_task_op(
+            crate::tp::queue::SyncOp::CreateEntity,
+            project_id,
+            task_id,
+            &serde_json::json!({ "user_story_id": user_story_id }),
+        )?;
+        Ok(())
     }
 
     pub fn get_task(&self, id: i64) -> Result<TaskDetail> {
@@ -159,8 +198,39 @@ impl Db {
             Vec::new()
         };
         let task = self.get_task_row(id)?;
+        if before.status != status {
+            self.enqueue_tp_status(&task)?;
+        }
         tx.commit()?;
         Ok(StatusChange { task, promoted })
+    }
+
+    /// Record a status change for TargetProcess when the project is linked.
+    /// Completing a task also queues its estimate as a time entry.
+    ///
+    /// `open` and `waiting` are skipped because they have no TargetProcess
+    /// counterpart — a freshly created entity already sits in the initial state.
+    /// Whether `in_progress` / `review` actually map to a state is decided at
+    /// drain time from the settings, which drop the row when they don't.
+    fn enqueue_tp_status(&self, task: &Task) -> Result<()> {
+        let Some(project) = self.tp_target(task.project_id)? else {
+            return Ok(());
+        };
+        match task.status {
+            Status::Done => {
+                self.enqueue_completion_ops(task, project.id)?;
+            }
+            Status::InProgress | Status::Review => {
+                self.enqueue_task_op(
+                    crate::tp::queue::SyncOp::SetState,
+                    project.id,
+                    task.id,
+                    &serde_json::json!({ "status": task.status.as_str() }),
+                )?;
+            }
+            Status::Open | Status::Waiting => {}
+        }
+        Ok(())
     }
 
     pub fn update_task(&self, id: i64, update: &TaskUpdate, actor: &str) -> Result<Task> {
@@ -195,6 +265,12 @@ impl Db {
             self.conn.execute(
                 "UPDATE tasks SET position = ?1, updated_at = ?2 WHERE id = ?3",
                 params![position, ts, id],
+            )?;
+        }
+        if let Some(estimate) = update.estimate_points {
+            self.conn.execute(
+                "UPDATE tasks SET estimate_points = ?1, updated_at = ?2 WHERE id = ?3",
+                params![estimate.max(0.0), ts, id],
             )?;
         }
         self.record_event(id, actor, "updated", "")?;
@@ -429,21 +505,42 @@ impl Db {
     }
 }
 
+/// The TargetProcess entity type a TaskBoard task of this kind mirrors to.
+/// TP models defects as a separate `Bugs` collection rather than a task field.
+pub(crate) fn tp_entity_type(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Task => "Task",
+        Kind::Bug => "Bug",
+    }
+}
+
 fn parse_status(row: &rusqlite::Row<'_>, idx: usize) -> rusqlite::Result<Status> {
     let s: String = row.get(idx)?;
     Status::from_str(&s).map_err(|e| {
-        rusqlite::Error::FromSqlConversionFailure(idx, Type::Text, Box::new(StringError(e.to_string())))
+        rusqlite::Error::FromSqlConversionFailure(
+            idx,
+            Type::Text,
+            Box::new(StringError(e.to_string())),
+        )
     })
 }
 
 fn row_to_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
     let kind_str: String = row.get(6)?;
     let kind = Kind::from_str(&kind_str).map_err(|e| {
-        rusqlite::Error::FromSqlConversionFailure(6, Type::Text, Box::new(StringError(e.to_string())))
+        rusqlite::Error::FromSqlConversionFailure(
+            6,
+            Type::Text,
+            Box::new(StringError(e.to_string())),
+        )
     })?;
     let priority_str: String = row.get(8)?;
     let priority = Priority::from_str(&priority_str).map_err(|e| {
-        rusqlite::Error::FromSqlConversionFailure(8, Type::Text, Box::new(StringError(e.to_string())))
+        rusqlite::Error::FromSqlConversionFailure(
+            8,
+            Type::Text,
+            Box::new(StringError(e.to_string())),
+        )
     })?;
     Ok(Task {
         id: row.get(0)?,
@@ -458,6 +555,12 @@ fn row_to_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
         position: row.get(9)?,
         created_at: row.get(10)?,
         updated_at: row.get(11)?,
+        tp_entity_id: row.get(12)?,
+        tp_entity_type: row.get(13)?,
+        estimate_points: row.get(14)?,
+        tp_sync_state: row.get(15)?,
+        tp_sync_error: row.get(16)?,
+        tp_time_logged: row.get(17)?,
     })
 }
 

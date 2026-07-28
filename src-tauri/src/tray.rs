@@ -47,11 +47,16 @@ pub fn init(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                         // Place just below the icon: icon bottom = position.y + half-icon-height.
                         // We add a small gap so it doesn't overlap the menu bar.
                         let icon_bottom = match rect.size {
-                            tauri::Size::Physical(s) => rect.position.to_physical::<f64>(1.0).y + s.height as f64,
-                            tauri::Size::Logical(s) => rect.position.to_physical::<f64>(1.0).y + s.height,
+                            tauri::Size::Physical(s) => {
+                                rect.position.to_physical::<f64>(1.0).y + s.height as f64
+                            }
+                            tauri::Size::Logical(s) => {
+                                rect.position.to_physical::<f64>(1.0).y + s.height
+                            }
                         };
                         let y = icon_bottom + 2.0;
-                        let _ = popover.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+                        let _ =
+                            popover.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
                         let _ = popover.show();
                         let _ = popover.set_focus();
                     }

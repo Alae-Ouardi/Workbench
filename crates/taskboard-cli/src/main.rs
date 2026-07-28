@@ -62,6 +62,9 @@ enum Command {
         /// Comma-separated task IDs this task depends on.
         #[arg(long, value_delimiter = ',')]
         depends_on: Vec<i64>,
+        /// Simulated human effort in points (1 = 1 hour, 0.5 = 30 min).
+        #[arg(long)]
+        estimate: Option<f64>,
     },
     /// List tasks, optionally filtered.
     List {
@@ -97,6 +100,9 @@ enum Command {
         assignee: Option<String>,
         #[arg(long)]
         priority: Option<String>,
+        /// Simulated human effort in points (1 = 1 hour, 0.5 = 30 min).
+        #[arg(long)]
+        estimate: Option<f64>,
     },
     /// Delete a task.
     Delete { id: i64 },
@@ -157,7 +163,11 @@ fn main() -> Result<()> {
     let json = cli.json;
 
     match cli.command {
-        Command::CreateProject { path, name, description } => {
+        Command::CreateProject {
+            path,
+            name,
+            description,
+        } => {
             let path = path.unwrap_or_else(cwd);
             let name = name.unwrap_or_else(|| {
                 std::path::Path::new(&path)
@@ -189,6 +199,7 @@ fn main() -> Result<()> {
             priority,
             bug,
             depends_on,
+            estimate,
         } => {
             let project = resolve_project(&db, project)?;
             let new = NewTask {
@@ -198,6 +209,7 @@ fn main() -> Result<()> {
                 kind: bug.then_some(Kind::Bug),
                 priority: priority.as_deref().map(Priority::from_str).transpose()?,
                 depends_on,
+                estimate_points: estimate,
             };
             let task = db.create_task(project.id, &new, &actor)?;
             if json {
@@ -259,7 +271,12 @@ fn main() -> Result<()> {
             if json {
                 println!("{}", serde_json::to_string_pretty(&task)?);
             } else {
-                println!("#{} dependencies set ({} deps), status: {}", id, depends_on.len(), task.status);
+                println!(
+                    "#{} dependencies set ({} deps), status: {}",
+                    id,
+                    depends_on.len(),
+                    task.status
+                );
             }
         }
         Command::Update {
@@ -268,6 +285,7 @@ fn main() -> Result<()> {
             description,
             assignee,
             priority,
+            estimate,
         } => {
             let update = TaskUpdate {
                 title,
@@ -275,6 +293,7 @@ fn main() -> Result<()> {
                 assignee,
                 priority: priority.as_deref().map(Priority::from_str).transpose()?,
                 position: None,
+                estimate_points: estimate,
             };
             let task = db.update_task(id, &update, &actor)?;
             if json {
@@ -293,7 +312,10 @@ fn main() -> Result<()> {
             if json {
                 println!("{}", serde_json::json!({"deleted": p.id, "name": p.name}));
             } else {
-                println!("Deleted project '{}' (#{}) and all its tasks.", p.name, p.id);
+                println!(
+                    "Deleted project '{}' (#{}) and all its tasks.",
+                    p.name, p.id
+                );
             }
         }
         Command::Briefing { project } => {

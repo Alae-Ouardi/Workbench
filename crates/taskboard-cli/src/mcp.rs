@@ -298,8 +298,15 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
         "create_project" => {
             let path = require_str(args, "path")?;
             let name = require_str(args, "name")?;
-            let description = args.get("description").and_then(Value::as_str).unwrap_or("");
-            Ok(serde_json::to_value(db.create_project(path, name, description)?)?)
+            let description = args
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            Ok(serde_json::to_value(db.create_project(
+                path,
+                name,
+                description,
+            )?)?)
         }
         "list_projects" => Ok(serde_json::to_value(db.list_projects()?)?),
         "list_tasks" => {
@@ -333,11 +340,9 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
                     .map_err(|e| anyhow::anyhow!("invalid task entry: {e}"))?;
                 new_tasks.push(new);
             }
-            Ok(serde_json::to_value(db.create_tasks(
-                project_id,
-                &new_tasks,
-                &actor,
-            )?)?)
+            Ok(serde_json::to_value(
+                db.create_tasks(project_id, &new_tasks, &actor)?,
+            )?)
         }
         "update_task_status" => {
             let status: Status = args
@@ -352,10 +357,7 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
             )?)?)
         }
         "add_task_comment" => {
-            let author = args
-                .get("author")
-                .and_then(Value::as_str)
-                .unwrap_or(&actor);
+            let author = args.get("author").and_then(Value::as_str).unwrap_or(&actor);
             let body = args
                 .get("body")
                 .and_then(Value::as_str)
@@ -387,6 +389,7 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
                 assignee: opt_string(args, "assignee"),
                 priority: opt_parse::<Priority>(args, "priority")?,
                 position: None,
+                estimate_points: args.get("estimate_points").and_then(|v| v.as_f64()),
             };
             Ok(serde_json::to_value(db.update_task(
                 require_id(args)?,

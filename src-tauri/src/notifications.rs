@@ -11,9 +11,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::Serialize;
+use taskboard_core::{Db, Status, Task, TaskFilter};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_notification::NotificationExt;
-use taskboard_core::{Db, Status, Task, TaskFilter};
 
 #[derive(Default, Clone)]
 pub struct TaskSnapshot {
@@ -108,9 +108,8 @@ impl TaskSnapshot {
         }
 
         // 3. Determine whether anything changed before updating the snapshot.
-        let changed = !task_notifications.is_empty()
-            || !completed.is_empty()
-            || self.has_changes(&tasks);
+        let changed =
+            !task_notifications.is_empty() || !completed.is_empty() || self.has_changes(&tasks);
 
         // 4. Update snapshot once.
         self.update(&tasks);
@@ -211,12 +210,7 @@ struct ProjectAllDone {
 }
 
 fn send(app: &AppHandle, title: &str, body: &str) {
-    let _ = app
-        .notification()
-        .builder()
-        .title(title)
-        .body(body)
-        .show();
+    let _ = app.notification().builder().title(title).body(body).show();
 }
 
 fn status_emoji(status: Status) -> &'static str {
@@ -257,6 +251,12 @@ mod tests {
             position: 0.0,
             created_at: "2026-06-16T00:00:00Z".to_string(),
             updated_at: "2026-06-16T00:00:00Z".to_string(),
+            tp_entity_id: None,
+            tp_entity_type: "Task".to_string(),
+            estimate_points: 0.0,
+            tp_sync_state: "none".to_string(),
+            tp_sync_error: String::new(),
+            tp_time_logged: 0.0,
         }
     }
 

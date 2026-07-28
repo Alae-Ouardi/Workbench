@@ -61,9 +61,7 @@ fn project_resolves_to_git_root() {
     std::fs::create_dir_all(&nested).unwrap();
 
     let db = db();
-    let from_nested = db
-        .ensure_project(nested.to_str().unwrap(), None)
-        .unwrap();
+    let from_nested = db.ensure_project(nested.to_str().unwrap(), None).unwrap();
     let from_root = db.ensure_project(root.to_str().unwrap(), None).unwrap();
     assert_eq!(from_nested.id, from_root.id);
 }
@@ -289,7 +287,11 @@ fn set_project_context_roundtrip() {
     let pid = project_id(&db, "/tmp/ctx");
     db.create_task(pid, &task("seed"), "ai").unwrap();
     let p = db
-        .set_project_context("/tmp/ctx", "add multi-currency support", "1. model\n2. service")
+        .set_project_context(
+            "/tmp/ctx",
+            "add multi-currency support",
+            "1. model\n2. service",
+        )
         .unwrap();
     assert_eq!(p.original_request, "add multi-currency support");
     assert_eq!(p.plan_summary, "1. model\n2. service");
@@ -301,7 +303,10 @@ fn set_project_context_roundtrip() {
         .into_iter()
         .find(|s| s.project.id == p.id)
         .unwrap();
-    assert_eq!(summary.project.original_request, "add multi-currency support");
+    assert_eq!(
+        summary.project.original_request,
+        "add multi-currency support"
+    );
 }
 
 #[test]
@@ -320,7 +325,13 @@ fn set_handoff_records_state_and_event() {
     let pid = project_id(&db, "/tmp/h");
     let t = db.create_task(pid, &task("work"), "ai").unwrap();
     let p = db
-        .set_handoff("/tmp/h", "claude-code", "sess-abc", "half done, do rounding next", Some(t.id))
+        .set_handoff(
+            "/tmp/h",
+            "claude-code",
+            "sess-abc",
+            "half done, do rounding next",
+            Some(t.id),
+        )
         .unwrap();
     assert_eq!(p.last_actor, "claude-code");
     assert_eq!(p.last_session_id, "sess-abc");
@@ -403,7 +414,11 @@ fn briefing_resume_none_when_all_done() {
 fn create_project_sets_name_and_brief() {
     let db = db();
     let p = db
-        .create_project("/tmp/new-proj", "My App", "Build a task manager with AI support")
+        .create_project(
+            "/tmp/new-proj",
+            "My App",
+            "Build a task manager with AI support",
+        )
         .unwrap();
     assert_eq!(p.name, "My App");
     assert_eq!(p.original_request, "Build a task manager with AI support");
@@ -421,8 +436,12 @@ fn create_project_sets_name_and_brief() {
 #[test]
 fn multiple_projects_per_path_are_isolated() {
     let db = db();
-    let p1 = db.create_project("/tmp/shared", "Request A", "first context").unwrap();
-    let p2 = db.create_project("/tmp/shared", "Request B", "second context").unwrap();
+    let p1 = db
+        .create_project("/tmp/shared", "Request A", "first context")
+        .unwrap();
+    let p2 = db
+        .create_project("/tmp/shared", "Request B", "second context")
+        .unwrap();
     assert_ne!(p1.id, p2.id);
     assert_eq!(p1.path, p2.path);
 
@@ -447,8 +466,10 @@ fn multiple_projects_per_path_are_isolated() {
     assert_eq!(tasks2[0].id, t2.id);
 
     // Context is per-project.
-    db.set_project_context_by_id(p1.id, "req A", "plan A").unwrap();
-    db.set_project_context_by_id(p2.id, "req B", "plan B").unwrap();
+    db.set_project_context_by_id(p1.id, "req A", "plan A")
+        .unwrap();
+    db.set_project_context_by_id(p2.id, "req B", "plan B")
+        .unwrap();
     let b1 = db.get_briefing_by_id(p1.id).unwrap();
     let b2 = db.get_briefing_by_id(p2.id).unwrap();
     assert_eq!(b1.project.original_request, "req A");
@@ -481,7 +502,6 @@ fn find_project_by_name_errors_when_ambiguous() {
 
 #[test]
 fn migration_adds_columns_to_legacy_projects_table() {
-
     // Simulate a pre-handoff DB: create a projects table with only the original
     // four columns, then open it through Db and confirm the migration ran.
     let dir = tempfile::tempdir().unwrap();
@@ -499,7 +519,7 @@ fn migration_adds_columns_to_legacy_projects_table() {
     let p = db.find_project_by_path("/tmp/old").unwrap().unwrap();
     assert_eq!(p.name, "old");
     assert_eq!(p.original_request, ""); // new column present with default
-    // And the new context can be written to the migrated row.
+                                        // And the new context can be written to the migrated row.
     let p = db
         .set_project_context("/tmp/old", "legacy request", "legacy plan")
         .unwrap();
@@ -507,4 +527,78 @@ fn migration_adds_columns_to_legacy_projects_table() {
     // The unique-path constraint must have been removed.
     let p2 = db.create_project("/tmp/old", "old v2", "").unwrap();
     assert_ne!(p2.id, p.id);
+}
+
+/// A legacy database and a freshly created one must end up with identical
+/// column sets, so queries written against `SCHEMA` work on both.
+#[test]
+fn migrated_and_fresh_schemas_match() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let legacy_path = dir.path().join("legacy.db");
+    {
+        let conn = rusqlite::Connection::open(&legacy_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, \
+             path TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL);
+             CREATE TABLE tasks (
+                 id INTEGER PRIMARY KEY,
+                 project_id INTEGER NOT NULL,
+                 title TEXT NOT NULL,
+                 description TEXT NOT NULL DEFAULT '',
+                 status TEXT NOT NULL DEFAULT 'open',
+                 kind TEXT NOT NULL DEFAULT 'task',
+                 assignee TEXT NOT NULL DEFAULT '',
+                 priority TEXT NOT NULL DEFAULT 'normal',
+                 position REAL NOT NULL DEFAULT 0,
+                 created_at TEXT NOT NULL,
+                 updated_at TEXT NOT NULL);
+             INSERT INTO projects (name, path, created_at) VALUES ('old', '/tmp/old', '2020-01-01');
+             INSERT INTO tasks (project_id, title, created_at, updated_at)
+                 VALUES (1, 'legacy task', '2020-01-01', '2020-01-01');",
+        )
+        .unwrap();
+    }
+    let legacy = Db::open(&legacy_path).unwrap();
+    let fresh = Db::open(&dir.path().join("fresh.db")).unwrap();
+
+    for table in ["projects", "tasks", "tp_sync_queue"] {
+        assert_eq!(
+            columns_of(&legacy, table),
+            columns_of(&fresh, table),
+            "column sets differ for `{table}`"
+        );
+    }
+
+    // The TP columns are readable on the migrated row, with their defaults.
+    let t = legacy.get_task(1).unwrap();
+    assert_eq!(t.task.title, "legacy task");
+    assert_eq!(t.task.estimate_points, 0.0);
+    assert_eq!(t.task.tp_entity_id, None);
+    assert_eq!(t.task.tp_sync_state, "none");
+}
+
+fn columns_of(db: &Db, table: &str) -> Vec<String> {
+    let mut cols: Vec<String> = db
+        .raw_query_column_names(table)
+        .expect("table should exist");
+    cols.sort();
+    cols
+}
+
+#[test]
+fn tp_columns_default_on_new_rows() {
+    let db = db();
+    let pid = project_id(&db, "/tmp/tp");
+    let p = db.find_project(&pid.to_string()).unwrap();
+    assert_eq!(p.tp_user_story_id, None);
+    assert_eq!(p.tp_user_story_name, "");
+    assert!(!p.tp_sync_enabled);
+
+    let t = db.create_task(pid, &task("plain"), "me").unwrap();
+    assert_eq!(t.estimate_points, 0.0);
+    assert_eq!(t.tp_entity_id, None);
+    assert_eq!(t.tp_entity_type, "Task");
+    assert_eq!(t.tp_sync_state, "none");
+    assert_eq!(t.tp_time_logged, 0.0);
 }
