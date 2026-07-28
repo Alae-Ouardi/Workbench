@@ -143,8 +143,41 @@ enum Command {
         #[arg(long, default_value = "")]
         session: String,
     },
+    /// TargetProcess integration: status, manual sync, project linking.
+    Tp {
+        #[command(subcommand)]
+        command: TpCommand,
+    },
     /// Run the MCP server over stdio (used by Claude Code / Codex / OpenCode).
     Mcp,
+}
+
+#[derive(Subcommand)]
+enum TpCommand {
+    /// Show the connection settings and how much work is queued.
+    Status,
+    /// Push everything queued to TargetProcess now (the app does this every 15s).
+    Sync,
+    /// Link a project to a TargetProcess user story.
+    Link {
+        /// User story id, or a pasted TargetProcess entity URL.
+        user_story: String,
+        /// Project id, path, or name (default: current directory).
+        #[arg(long, short)]
+        project: Option<String>,
+        /// Don't mirror the tasks that already exist in this project.
+        #[arg(long)]
+        no_backfill: bool,
+    },
+    /// Stop syncing a project. TargetProcess entities are left alone.
+    Unlink {
+        #[arg(long, short)]
+        project: Option<String>,
+    },
+    /// List queued operations, with the error on any that failed.
+    Queue,
+    /// Make every failed operation due again (e.g. after fixing the token).
+    Retry,
 }
 
 fn main() -> Result<()> {
@@ -357,7 +390,140 @@ fn main() -> Result<()> {
                 }
             }
         }
+        Command::Tp { command } => run_tp(&db, command, json)?,
         Command::Mcp => unreachable!(),
+    }
+    Ok(())
+}
+
+fn run_tp(db: &Db, command: TpCommand, json: bool) -> Result<()> {
+    use taskboard_core::TpSettings;
+
+    match command {
+        TpCommand::Status => {
+            let settings = TpSettings::load();
+            let (pending, failed) = db.count_tp_queue()?;
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "configured": settings.has_valid_url(),
+                        "enabled": settings.enabled,
+                        "base_url": settings.normalized_base_url(),
+                        "user": settings.cached_user_name,
+                        "pending": pending,
+                        "failed": failed,
+                    })
+                );
+            } else {
+                let url = settings.normalized_base_url();
+                println!(
+                    "TargetProcess: {}",
+                    if url.is_empty() {
+                        "not configured"
+                    } else {
+                        url
+                    }
+                );
+                println!(
+                    "Sync:          {}",
+                    if settings.enabled { "on" } else { "off" }
+                );
+                println!("Done state:    {}", settings.done_state_name);
+                if !settings.cached_user_name.is_empty() {
+                    println!("Token owner:   {}", settings.cached_user_name);
+                }
+                println!("Queued:        {pending} pending, {failed} failed");
+            }
+        }
+        TpCommand::Sync => {
+            let report = db.drain_tp_queue()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!(
+                    "Synced {} of {} operation(s); {} failed, {} dropped, {} still queued.",
+                    report.succeeded,
+                    report.processed,
+                    report.failed,
+                    report.dropped,
+                    report.pending
+                );
+                if let Some(error) = report.error {
+                    println!("First error: {error}");
+                }
+            }
+        }
+        TpCommand::Link {
+            user_story,
+            project,
+            no_backfill,
+        } => {
+            let project = resolve_project(db, project)?;
+            let story_id = taskboard_core::tp::client::parse_entity_id(&user_story)
+                .ok_or_else(|| anyhow::anyhow!("'{user_story}' is not a user story id or URL"))?;
+            let linked = db.link_tp_project(project.id, story_id)?;
+            let queued = if no_backfill {
+                0
+            } else {
+                db.backfill_tp_project(project.id)?
+            };
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "project": linked, "queued_operations": queued })
+                );
+            } else {
+                println!(
+                    "Linked '{}' to user story #{} ({}).",
+                    linked.name, story_id, linked.tp_user_story_name
+                );
+                if queued > 0 {
+                    println!(
+                        "Queued {queued} operation(s) — run `taskboard tp sync` to push them."
+                    );
+                }
+            }
+        }
+        TpCommand::Unlink { project } => {
+            let project = resolve_project(db, project)?;
+            let unlinked = db.unlink_tp_project(project.id)?;
+            println!("Unlinked '{}' from TargetProcess.", unlinked.name);
+        }
+        TpCommand::Queue => {
+            let items = db.list_tp_queue()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&items)?);
+            } else if items.is_empty() {
+                println!("Nothing queued.");
+            } else {
+                for item in items {
+                    let task = if item.task_title.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" — {}", item.task_title)
+                    };
+                    println!(
+                        "#{} {}{}{}",
+                        item.id,
+                        item.label,
+                        task,
+                        if item.exhausted {
+                            "  [needs retry]"
+                        } else {
+                            ""
+                        }
+                    );
+                    if !item.last_error.is_empty() {
+                        println!("     attempt {}: {}", item.attempts, item.last_error);
+                    }
+                }
+            }
+        }
+        TpCommand::Retry => {
+            let n = db.retry_all_tp_ops()?;
+            println!("Reset {n} failed operation(s); run `taskboard tp sync` to retry.");
+        }
     }
     Ok(())
 }

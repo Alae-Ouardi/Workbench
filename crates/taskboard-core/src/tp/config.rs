@@ -93,8 +93,7 @@ impl TpSettings {
             std::fs::create_dir_all(parent)?;
         }
         let tmp = path.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(self)?)?;
-        set_owner_only(&tmp)?;
+        write_owner_only(&tmp, &serde_json::to_vec_pretty(self)?)?;
         std::fs::rename(&tmp, path)?;
         Ok(())
     }
@@ -215,20 +214,36 @@ fn write_fallback_token(token: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::write(&path, token)?;
-    set_owner_only(&path)?;
-    Ok(())
+    write_owner_only(&path, token.as_bytes())
 }
 
+/// Write `contents` to `path` with owner-only permissions.
+///
+/// The mode is set as the file is created, not afterwards: creating it with the
+/// process umask first and tightening it later leaves a window in which another
+/// local user can read a token.
 #[cfg(unix)]
-fn set_owner_only(path: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+fn write_owner_only(path: &Path, contents: &[u8]) -> Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    // `mode` only applies when the file is created, so an existing file with
+    // looser permissions still needs tightening.
+    file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    file.write_all(contents)?;
+    file.sync_all()?;
     Ok(())
 }
 
 #[cfg(not(unix))]
-fn set_owner_only(_path: &Path) -> Result<()> {
+fn write_owner_only(path: &Path, contents: &[u8]) -> Result<()> {
+    std::fs::write(path, contents)?;
     Ok(())
 }
 
@@ -266,6 +281,46 @@ mod tests {
         let loaded = TpSettings::load_from(&path);
         assert_eq!(loaded, s);
         assert_eq!(loaded.normalized_base_url(), "https://acme.tpondemand.com");
+    }
+
+    /// Regression guard: a secret must never exist on disk world-readable, not
+    /// even momentarily, and not when overwriting a loose pre-existing file.
+    #[cfg(unix)]
+    #[test]
+    fn secrets_are_written_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+
+        let fresh = dir.path().join("fresh.secret");
+        write_owner_only(&fresh, b"tok").unwrap();
+        assert_eq!(
+            std::fs::metadata(&fresh).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+
+        // An existing world-readable file gets tightened rather than trusted.
+        let loose = dir.path().join("loose.secret");
+        std::fs::write(&loose, b"old").unwrap();
+        std::fs::set_permissions(&loose, std::fs::Permissions::from_mode(0o644)).unwrap();
+        write_owner_only(&loose, b"new").unwrap();
+        assert_eq!(
+            std::fs::metadata(&loose).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(std::fs::read_to_string(&loose).unwrap(), "new");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saved_config_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        TpSettings::default().save_to(&path).unwrap();
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
     }
 
     #[test]
