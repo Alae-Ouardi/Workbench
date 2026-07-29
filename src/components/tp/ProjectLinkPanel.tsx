@@ -13,8 +13,10 @@ interface ProjectLinkPanelProps {
 /**
  * Link or unlink one project's TargetProcess user story.
  *
- * Linking a project that already has tasks offers to mirror them, since the
- * common case is linking mid-flight after an agent has already planned.
+ * Linking a project that already has tasks is a choice, not a default:
+ * mirroring everything is right when linking mid-flight after an agent has
+ * already planned, but wrong when the existing tasks are old and only new
+ * work should go to TargetProcess going forward.
  */
 export function ProjectLinkPanel({
   project,
@@ -117,27 +119,49 @@ export function ProjectLinkPanel({
         </button>
       )}
       {note && <p className="text-[10px] text-amber-500">{note}</p>}
-      {picked && (
+      {picked && taskCount === 0 && (
         <button
           disabled={busy}
-          onClick={() =>
-            act(async () => {
-              await tpLinkProject(project.id, String(picked.id));
-              if (taskCount > 0) {
-                const queued = await tpBackfillProject(project.id);
-                setNote(`Linked, and queued ${queued} operation(s) for existing tasks.`);
-              }
-              setPicked(null);
-            })
-          }
+          onClick={() => act(async () => { await tpLinkProject(project.id, String(picked.id)); setPicked(null); })}
           className="w-full rounded bg-sky-700 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-600 disabled:opacity-40"
         >
-          {busy
-            ? "Linking…"
-            : taskCount > 0
-              ? `Link and mirror ${taskCount} existing task${taskCount === 1 ? "" : "s"}`
-              : "Link user story"}
+          {busy ? "Linking…" : "Link user story"}
         </button>
+      )}
+      {picked && taskCount > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] leading-relaxed text-slate-500">
+            This project already has {taskCount} task{taskCount === 1 ? "" : "s"}. Mirror them
+            into TargetProcess too, or leave them local and only sync tasks created from now on.
+          </p>
+          <button
+            disabled={busy}
+            onClick={() =>
+              act(async () => {
+                await tpLinkProject(project.id, String(picked.id));
+                const queued = await tpBackfillProject(project.id);
+                setNote(`Linked, and queued ${queued} operation(s) for existing tasks.`);
+                setPicked(null);
+              })
+            }
+            className="w-full rounded bg-sky-700 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-600 disabled:opacity-40"
+          >
+            {busy ? "Linking…" : `Link and sync all ${taskCount} existing task${taskCount === 1 ? "" : "s"}`}
+          </button>
+          <button
+            disabled={busy}
+            onClick={() =>
+              act(async () => {
+                await tpLinkProject(project.id, String(picked.id));
+                setNote(`Linked. Existing ${taskCount} task${taskCount === 1 ? "" : "s"} stay local — only new tasks will sync.`);
+                setPicked(null);
+              })
+            }
+            className="w-full rounded border border-[#2a3040] px-2 py-1.5 text-[11px] text-slate-300 hover:border-sky-700 hover:text-sky-400 disabled:opacity-40"
+          >
+            {busy ? "Linking…" : "Link, but ignore existing tasks"}
+          </button>
+        </div>
       )}
     </div>
   );
