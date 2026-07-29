@@ -166,7 +166,9 @@ export default function App() {
                   onResume={(id) => setOpenTaskId(id)}
                 />
               )}
-              <div className="flex-1 overflow-hidden">
+              {/* min-h-0 lets this shrink below its content, so a tall banner
+                  above can never squeeze the board out of the layout. */}
+              <div className="min-h-0 flex-1 overflow-hidden">
                 <Board
                   tasks={visibleTasks}
                   showProject={selectedProjectId === null}

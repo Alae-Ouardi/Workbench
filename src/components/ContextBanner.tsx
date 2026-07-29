@@ -71,12 +71,18 @@ export function ContextBanner({ projectId, refreshKey, onResume }: ContextBanner
     setTimeout(() => setCopied(false), 1500);
   }
 
-  const bannerStyle = !collapsed && height !== null ? { height, overflow: "auto" } : undefined;
+  // A dragged height is a request, not a guarantee: `max-h-[80%]` below still
+  // caps it, so the board can never be pushed out of view.
+  const bannerStyle = !collapsed && height !== null ? { height } : undefined;
 
   return (
     <div
       data-banner
-      className="relative shrink-0 border-b border-[#1c2230] bg-[#0d1018] px-4 py-2.5 text-xs"
+      // Long context used to grow this banner without limit. Being `shrink-0`,
+      // it then squeezed the sibling board to zero height and the tasks
+      // disappeared entirely. Capping at 80% of the panel and scrolling the
+      // overflow keeps at least a fifth of the height for the board.
+      className="relative shrink-0 max-h-[80%] overflow-y-auto border-b border-[#1c2230] bg-[#0d1018] px-4 py-2.5 text-xs"
       style={bannerStyle}
     >
       <div className="flex items-center gap-2">
