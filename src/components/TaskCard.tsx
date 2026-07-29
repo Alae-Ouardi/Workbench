@@ -1,5 +1,8 @@
 import { useDraggable } from "@dnd-kit/core";
 import type { Task } from "../types";
+import { EstimateBadge } from "./tp/EstimateInput";
+import { SyncBadge } from "./tp/SyncBadge";
+import { TpChip } from "./tp/TpChip";
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: "bg-slate-500",
@@ -52,20 +55,29 @@ export function TaskCard({ task, showProject, onOpen }: TaskCardProps) {
             bug
           </span>
         )}
-        {showProject && (
-          <span className="ml-auto truncate text-[10px] text-slate-500">{task.project_name}</span>
-        )}
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          <SyncBadge state={task.tp_sync_state} error={task.tp_sync_error} />
+          {showProject && (
+            <span className="truncate text-[10px] text-slate-500">{task.project_name}</span>
+          )}
+        </span>
       </div>
       <div className="text-sm leading-snug text-slate-200">{task.title}</div>
-      {task.assignee && (
-        <div className="mt-2">
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] ${
-              ASSIGNEE_COLORS[task.assignee] ?? "bg-slate-800 text-slate-300"
-            }`}
-          >
-            {task.assignee}
-          </span>
+      {(task.assignee || task.estimate_points > 0 || task.tp_entity_id !== null) && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {task.assignee && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] ${
+                ASSIGNEE_COLORS[task.assignee] ?? "bg-slate-800 text-slate-300"
+              }`}
+            >
+              {task.assignee}
+            </span>
+          )}
+          <EstimateBadge points={task.estimate_points} logged={task.tp_time_logged} />
+          {task.tp_entity_id !== null && (
+            <TpChip entityId={task.tp_entity_id} label={task.tp_entity_type} />
+          )}
         </div>
       )}
     </div>

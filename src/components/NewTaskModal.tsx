@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Kind, NewTaskInput, Priority, ProjectSummary } from "../types";
+import { EstimateInput } from "./tp/EstimateInput";
 
 interface NewTaskModalProps {
   projects: ProjectSummary[];
@@ -19,6 +20,7 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
   const [kind, setKind] = useState<Kind>("task");
   const [priority, setPriority] = useState<Priority>("normal");
   const [assignee, setAssignee] = useState("me");
+  const [estimate, setEstimate] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -42,6 +44,7 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
         kind,
         priority,
         assignee: assignee.trim(),
+        estimatePoints: estimate,
       });
       onClose();
     } catch (err: unknown) {
@@ -137,6 +140,15 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
           className="mb-4 w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-3 py-2 text-sm outline-none focus:border-sky-600"
           placeholder="me, claude-code, codex, opencode…"
         />
+
+        <label className="mb-1 block text-xs text-slate-500">Estimate</label>
+        <div className="mb-1">
+          <EstimateInput value={estimate} onChange={setEstimate} />
+        </div>
+        <p className="mb-4 text-[10px] leading-relaxed text-slate-600">
+          Human effort in points: 1 = 1 hour, 0.5 = 30 min. Logged as time spent in
+          TargetProcess when the task is completed.
+        </p>
 
         {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
 

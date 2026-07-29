@@ -15,12 +15,13 @@ import { ContextBanner } from "./components/ContextBanner";
 import { ProjectDoneBanner } from "./components/ProjectDoneBanner";
 import { NewProjectModal } from "./components/NewProjectModal";
 import { NewTaskModal } from "./components/NewTaskModal";
+import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { TerminalPanel } from "./components/Terminal";
 import type { NewTaskInput, Project, ProjectSummary, Status, Task } from "./types";
 
-type Panel = "board" | "terminal";
+type Panel = "board" | "terminal" | "settings";
 
 export default function App() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -119,6 +120,8 @@ export default function App() {
         onSelect={handleSelectProject}
         onDeleteProject={handleDeleteProject}
         onNewProject={() => setShowNewProject(true)}
+        onProjectChanged={refresh}
+        onOpenSettings={() => setPanel("settings")}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -180,6 +183,12 @@ export default function App() {
             </div>
           )}
 
+          {panel === "settings" && (
+            <div className="flex-1 overflow-hidden">
+              <SettingsView />
+            </div>
+          )}
+
           {openTaskId !== null && (
             <TaskDrawer
               taskId={openTaskId}
@@ -209,18 +218,25 @@ export default function App() {
   );
 }
 
+const PANEL_LABELS: Record<Panel, string> = {
+  board: "Board",
+  terminal: "Terminal",
+  settings: "⚙",
+};
+
 function PanelToggle({ active, onChange }: { active: Panel; onChange: (p: Panel) => void }) {
   return (
     <div className="flex rounded-md border border-[#2a3040] p-0.5">
-      {(["board", "terminal"] as Panel[]).map((p) => (
+      {(["board", "terminal", "settings"] as Panel[]).map((p) => (
         <button
           key={p}
           onClick={() => onChange(p)}
+          title={p === "settings" ? "Settings — TargetProcess integration" : undefined}
           className={`rounded px-3 py-0.5 text-xs transition-colors ${
             active === p ? "bg-[#1c2230] text-slate-200" : "text-slate-600 hover:text-slate-400"
           }`}
         >
-          {p === "board" ? "Board" : "Terminal"}
+          {PANEL_LABELS[p]}
         </button>
       ))}
     </div>

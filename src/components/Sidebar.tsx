@@ -1,6 +1,7 @@
 import { useState } from "react";
 import packageJson from "../../package.json";
 import type { ProjectSummary } from "../types";
+import { ProjectLinkPanel } from "./tp/ProjectLinkPanel";
 
 interface SidebarProps {
   projects: ProjectSummary[];
@@ -8,10 +9,21 @@ interface SidebarProps {
   onSelect: (id: number | null) => void;
   onDeleteProject: (id: number) => void;
   onNewProject: () => void;
+  onProjectChanged: () => void;
+  onOpenSettings: () => void;
 }
 
-export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNewProject }: SidebarProps) {
+export function Sidebar({
+  projects,
+  selectedId,
+  onSelect,
+  onDeleteProject,
+  onNewProject,
+  onProjectChanged,
+  onOpenSettings,
+}: SidebarProps) {
   const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [menuId, setMenuId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
 
   const totalActive = projects.reduce(
@@ -20,19 +32,17 @@ export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNew
   );
 
   const confirmProject = confirmId !== null ? projects.find((p) => p.id === confirmId) : null;
+  const menuProject = menuId !== null ? projects.find((p) => p.id === menuId) : null;
 
   const filtered = query.trim()
     ? projects.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
     : projects;
 
-  function handleDeleteClick(id: number) {
-    setConfirmId(id);
-  }
-
   function handleConfirm() {
     if (confirmId !== null) {
       onDeleteProject(confirmId);
       setConfirmId(null);
+      setMenuId(null);
     }
   }
 
@@ -74,8 +84,9 @@ export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNew
             count={p.open + p.waiting + p.in_progress + p.review}
             inProgress={p.in_progress > 0}
             selected={selectedId === p.id}
+            linkedStoryId={p.tp_user_story_id}
             onClick={() => onSelect(p.id)}
-            onDelete={() => handleDeleteClick(p.id)}
+            onOpenMenu={() => setMenuId(p.id)}
             title={p.path}
           />
         ))}
@@ -88,9 +99,22 @@ export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNew
         )}
       </nav>
 
+      {menuProject && !confirmProject && (
+        <ProjectMenu
+          project={menuProject}
+          onClose={() => setMenuId(null)}
+          onDelete={() => setConfirmId(menuProject.id)}
+          onChanged={onProjectChanged}
+          onOpenSettings={() => {
+            setMenuId(null);
+            onOpenSettings();
+          }}
+        />
+      )}
+
       {confirmProject && (
         <ConfirmDialog
-          projectName={confirmProject.name}
+          project={confirmProject}
           onConfirm={handleConfirm}
           onCancel={() => setConfirmId(null)}
         />
@@ -102,21 +126,96 @@ export function Sidebar({ projects, selectedId, onSelect, onDeleteProject, onNew
   );
 }
 
+interface ProjectMenuProps {
+  project: ProjectSummary;
+  onClose: () => void;
+  onDelete: () => void;
+  onChanged: () => void;
+  onOpenSettings: () => void;
+}
+
+/** Per-project settings: the TargetProcess link, and deleting the project. */
+function ProjectMenu({
+  project,
+  onClose,
+  onDelete,
+  onChanged,
+  onOpenSettings,
+}: ProjectMenuProps) {
+  const total =
+    project.open + project.waiting + project.in_progress + project.review + project.done;
+
+  return (
+    <div
+      className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm space-y-4 rounded-lg border border-[#2a3040] bg-[#0d1018] p-4 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div>
+          <p className="truncate text-sm font-semibold text-slate-200">{project.name}</p>
+          <p className="truncate text-[10px] text-slate-600">{project.path}</p>
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+            TargetProcess
+          </p>
+          <ProjectLinkPanel
+            project={project}
+            onChanged={onChanged}
+            onOpenSettings={onOpenSettings}
+          />
+        </div>
+
+        <div className="flex items-center justify-between border-t border-[#1c2230] pt-3">
+          <button
+            onClick={onDelete}
+            className="rounded border border-red-900/60 px-2.5 py-1 text-[11px] text-red-400 hover:bg-red-950/40"
+          >
+            Delete project{total > 0 && ` and ${total} task${total === 1 ? "" : "s"}`}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-[11px] text-slate-500 hover:text-slate-300"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface ConfirmDialogProps {
-  projectName: string;
+  project: ProjectSummary;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-function ConfirmDialog({ projectName, onConfirm, onCancel }: ConfirmDialogProps) {
+function ConfirmDialog({ project, onConfirm, onCancel }: ConfirmDialogProps) {
+  const total =
+    project.open + project.waiting + project.in_progress + project.review + project.done;
+
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="mx-4 rounded-lg border border-[#2a3040] bg-[#0d1018] p-4 shadow-xl">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-sm rounded-lg border border-[#2a3040] bg-[#0d1018] p-4 shadow-xl">
         <p className="mb-1 text-sm font-semibold text-slate-200">Delete project?</p>
-        <p className="mb-4 text-xs text-slate-400">
-          <span className="font-medium text-slate-300">"{projectName}"</span> and all its tasks
-          will be permanently deleted.
+        <p className="mb-3 text-xs leading-relaxed text-slate-400">
+          <span className="font-medium text-slate-300">"{project.name}"</span> and{" "}
+          <span className="font-medium text-slate-300">
+            {total === 0 ? "no tasks" : `all ${total} of its task${total === 1 ? "" : "s"}`}
+          </span>{" "}
+          will be permanently deleted. This cannot be undone.
         </p>
+        {project.tp_user_story_id !== null && (
+          <p className="mb-3 rounded border border-amber-900/60 bg-amber-950/30 px-2 py-1.5 text-[10px] leading-relaxed text-amber-500">
+            Nothing is deleted in TargetProcess — user story #{project.tp_user_story_id} and any
+            entities already created under it are left as they are.
+          </p>
+        )}
         <div className="flex gap-2">
           <button
             onClick={onConfirm}
@@ -142,11 +241,21 @@ interface SidebarItemProps {
   selected: boolean;
   inProgress?: boolean;
   title?: string;
+  linkedStoryId?: number | null;
   onClick: () => void;
-  onDelete?: () => void;
+  onOpenMenu?: () => void;
 }
 
-function SidebarItem({ label, count, selected, inProgress, title, onClick, onDelete }: SidebarItemProps) {
+function SidebarItem({
+  label,
+  count,
+  selected,
+  inProgress,
+  title,
+  linkedStoryId,
+  onClick,
+  onOpenMenu,
+}: SidebarItemProps) {
   return (
     <div className="group relative flex items-center">
       <button
@@ -158,23 +267,33 @@ function SidebarItem({ label, count, selected, inProgress, title, onClick, onDel
       >
         <span className="flex min-w-0 flex-1 flex-col truncate">
           <span className="flex items-center gap-1.5 truncate">
-            {inProgress && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-violet-400" />}
+            {inProgress && (
+              <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-violet-400" />
+            )}
             <span className="truncate">{label}</span>
+            {linkedStoryId != null && (
+              <span
+                title={`Linked to TargetProcess user story #${linkedStoryId}`}
+                className="shrink-0 font-mono text-[9px] text-sky-600"
+              >
+                TP
+              </span>
+            )}
           </span>
           {title && <span className="truncate text-[10px] text-slate-600">{title}</span>}
         </span>
         {count > 0 && <span className="ml-2 shrink-0 text-xs text-slate-500">{count}</span>}
       </button>
-      {onDelete && (
+      {onOpenMenu && (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onDelete();
+            onOpenMenu();
           }}
-          title="Delete project"
-          className="absolute right-1.5 flex h-5 w-5 items-center justify-center rounded text-slate-700 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+          title="Project settings — TargetProcess link, delete"
+          className="absolute right-1 flex h-5 w-5 items-center justify-center rounded text-slate-600 transition-colors hover:bg-[#1b2232] hover:text-slate-200"
         >
-          ✕
+          ⋯
         </button>
       )}
     </div>

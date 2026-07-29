@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { createProject } from "../api";
-import type { Project } from "../types";
+import { createProject, tpLinkProject } from "../api";
+import type { Project, TpUserStory } from "../types";
+import { UserStoryPicker } from "./tp/UserStoryPicker";
 
 interface NewProjectModalProps {
   onCreated: (project: Project) => void;
@@ -14,6 +15,7 @@ export function NewProjectModal({ onCreated, onClose }: NewProjectModalProps) {
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [story, setStory] = useState<TpUserStory | null>(null);
 
   async function pickFolder() {
     const selected = await open({ directory: true, multiple: false });
@@ -34,6 +36,17 @@ export function NewProjectModal({ onCreated, onClose }: NewProjectModalProps) {
     setError(null);
     try {
       const project = await createProject(path.trim(), name.trim(), description.trim());
+      if (story) {
+        // Linking is secondary: keep the project even if TargetProcess refuses,
+        // and say so rather than looking like the whole thing failed.
+        try {
+          await tpLinkProject(project.id, String(story.id));
+        } catch (linkErr: unknown) {
+          setError(`Project created, but linking the user story failed: ${linkErr}`);
+          setSaving(false);
+          return;
+        }
+      }
       onCreated(project);
     } catch (err: unknown) {
       setError(String(err));
@@ -91,6 +104,17 @@ export function NewProjectModal({ onCreated, onClose }: NewProjectModalProps) {
           className="mb-4 w-full resize-none rounded-md border border-[#2a3040] bg-[#0b0e14] px-3 py-2 text-sm outline-none focus:border-sky-600"
           placeholder="Describe what you want to build so AI tools can plan from it…"
         />
+
+        <label className="mb-1 block text-xs text-slate-500">
+          TargetProcess user story <span className="text-slate-700">(optional)</span>
+        </label>
+        <div className="mb-1">
+          <UserStoryPicker value={story} onChange={setStory} />
+        </div>
+        <p className="mb-4 text-[10px] leading-relaxed text-slate-600">
+          Link one and this project's tasks are mirrored under it, with their estimates logged
+          as time when they're done.
+        </p>
 
         {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
 

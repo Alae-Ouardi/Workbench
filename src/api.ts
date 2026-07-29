@@ -8,8 +8,14 @@ import type {
   ProjectSummary,
   Status,
   StatusChange,
+  SyncQueueItem,
+  SyncReport,
   Task,
   TaskDetail,
+  TpSettings,
+  TpSettingsView,
+  TpUser,
+  TpUserStory,
 } from "./types";
 
 export function listProjects(): Promise<ProjectSummary[]> {
@@ -32,6 +38,7 @@ export function createTask(input: NewTaskInput): Promise<Task> {
     kind: input.kind,
     priority: input.priority,
     assignee: input.assignee,
+    estimatePoints: input.estimatePoints,
   });
 }
 
@@ -49,7 +56,13 @@ export function deleteTask(id: number): Promise<void> {
 
 export function updateTask(
   id: number,
-  fields: { title?: string; description?: string; assignee?: string; priority?: string },
+  fields: {
+    title?: string;
+    description?: string;
+    assignee?: string;
+    priority?: string;
+    estimatePoints?: number;
+  },
 ): Promise<Task> {
   return invoke("update_task", { id, ...fields });
 }
@@ -80,6 +93,66 @@ export function updateProjectContext(
 
 export function onBoardChanged(callback: () => void): Promise<UnlistenFn> {
   return listen("board-changed", callback);
+}
+
+// --- TargetProcess ---
+
+export function tpGetSettings(): Promise<TpSettingsView> {
+  return invoke("tp_get_settings");
+}
+
+export function tpSaveSettings(settings: TpSettings): Promise<TpSettingsView> {
+  return invoke("tp_save_settings", { settings });
+}
+
+export function tpSetToken(token: string): Promise<TpSettingsView> {
+  return invoke("tp_set_token", { token });
+}
+
+export function tpClearToken(): Promise<TpSettingsView> {
+  return invoke("tp_clear_token");
+}
+
+export function tpTestConnection(): Promise<TpUser> {
+  return invoke("tp_test_connection");
+}
+
+export function tpSearchUserStories(query: string): Promise<TpUserStory[]> {
+  return invoke("tp_search_user_stories", { query });
+}
+
+/** `userStory` accepts an id or a pasted `…/entity/<id>` URL. */
+export function tpLinkProject(projectId: number, userStory: string): Promise<Project> {
+  return invoke("tp_link_project", { projectId, userStory });
+}
+
+export function tpUnlinkProject(projectId: number): Promise<Project> {
+  return invoke("tp_unlink_project", { projectId });
+}
+
+/** Queue every not-yet-mirrored task; resolves to the number of operations queued. */
+export function tpBackfillProject(projectId: number): Promise<number> {
+  return invoke("tp_backfill_project", { projectId });
+}
+
+export function tpSyncNow(): Promise<SyncReport> {
+  return invoke("tp_sync_now");
+}
+
+export function tpListQueue(): Promise<SyncQueueItem[]> {
+  return invoke("tp_list_queue");
+}
+
+export function tpRetryQueueItem(id: number): Promise<void> {
+  return invoke("tp_retry_queue_item", { id });
+}
+
+export function tpRetryAllQueueItems(): Promise<number> {
+  return invoke("tp_retry_all_queue_items");
+}
+
+export function tpDismissQueueItem(id: number): Promise<void> {
+  return invoke("tp_dismiss_queue_item", { id });
 }
 
 export interface ProjectAllDone {

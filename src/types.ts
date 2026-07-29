@@ -24,6 +24,12 @@ export interface Project {
   handoff_note: string;
   current_task_id: number | null;
   handoff_updated_at: string | null;
+  /** TargetProcess user story this project's tasks are mirrored under. */
+  tp_user_story_id: number | null;
+  tp_user_story_name: string;
+  tp_project_id: number | null;
+  tp_process_id: number | null;
+  tp_sync_enabled: boolean;
 }
 
 export interface ProjectSummary extends Project {
@@ -47,7 +53,19 @@ export interface Task {
   position: number;
   created_at: string;
   updated_at: string;
+  /** Id of the mirrored TargetProcess entity, once it has been created. */
+  tp_entity_id: number | null;
+  /** TargetProcess entity type: "Task" or "Bug". */
+  tp_entity_type: string;
+  /** Simulated human effort in points, where 1 point = 1 hour. */
+  estimate_points: number;
+  tp_sync_state: TpSyncState;
+  tp_sync_error: string;
+  /** Hours already logged to TargetProcess; guards against double-logging. */
+  tp_time_logged: number;
 }
+
+export type TpSyncState = "none" | "pending" | "synced" | "error";
 
 export interface Comment {
   id: number;
@@ -97,4 +115,74 @@ export interface NewTaskInput {
   kind: Kind;
   priority: Priority;
   assignee: string;
+  estimatePoints: number;
+}
+
+// ---------------------------------------------------------------- TargetProcess
+
+/** Non-secret TargetProcess settings, as stored in ~/.taskboard/config.json. */
+export interface TpSettings {
+  base_url: string;
+  enabled: boolean;
+  /** Minutes east of UTC (opposite sign to JS getTimezoneOffset). */
+  tz_offset_minutes: number;
+  done_state_name: string;
+  /** Empty means "don't sync this transition". */
+  in_progress_state_name: string;
+  review_state_name: string;
+  cached_user_id: number | null;
+  cached_user_name: string;
+}
+
+/** Settings plus derived fields. The token itself is never sent to the UI. */
+export interface TpSettingsView extends TpSettings {
+  token_set: boolean;
+  base_url_normalized: string;
+}
+
+export interface TpUser {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface TpUserStory {
+  id: number;
+  name: string;
+  state_name: string;
+  project_id: number | null;
+  project_name: string;
+  process_id: number | null;
+}
+
+export interface SyncQueueItem {
+  id: number;
+  kind: "create_entity" | "set_state" | "log_time";
+  /** Human-readable label for `kind`. */
+  label: string;
+  project_id: number;
+  task_id: number | null;
+  task_title: string;
+  attempts: number;
+  last_error: string;
+  next_attempt_at: string;
+  created_at: string;
+  /** Automatic retries are exhausted; only a manual retry will move it. */
+  exhausted: boolean;
+}
+
+export interface SyncReport {
+  processed: number;
+  succeeded: number;
+  failed: number;
+  dropped: number;
+  pending: number;
+  error: string | null;
+}
+
+/** Format an effort estimate in points for display, where 1 point = 1 hour. */
+export function formatEstimate(points: number): string {
+  if (points <= 0) return "";
+  if (points < 1) return `${Math.round(points * 60)}m`;
+  return Number.isInteger(points) ? `${points}h` : `${points}h`;
 }

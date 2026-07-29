@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { addComment, deleteTask, getTask, setStatus, updateTask } from "../api";
-import type { Priority, Status, TaskDetail } from "../types";
+import { formatEstimate, type Priority, type Status, type TaskDetail } from "../types";
+import { EstimateInput } from "./tp/EstimateInput";
+import { SyncBadge } from "./tp/SyncBadge";
+import { TpChip } from "./tp/TpChip";
 import { STATUS_LABELS, STATUSES } from "../types";
 
 interface TaskDrawerProps {
@@ -66,6 +69,12 @@ export function TaskDrawer({ taskId, onClose, onRefresh }: TaskDrawerProps) {
 
   async function handlePriorityChange(priority: string) {
     await updateTask(taskId, { priority });
+    onRefresh();
+    await load();
+  }
+
+  async function handleEstimateChange(estimatePoints: number) {
+    await updateTask(taskId, { estimatePoints });
     onRefresh();
     await load();
   }
@@ -158,7 +167,31 @@ export function TaskDrawer({ taskId, onClose, onRefresh }: TaskDrawerProps) {
                 {detail.assignee}
               </span>
             )}
+            {detail.tp_entity_id !== null && (
+              <TpChip entityId={detail.tp_entity_id} label={detail.tp_entity_type} size="md" />
+            )}
+            <SyncBadge
+              state={detail.tp_sync_state}
+              error={detail.tp_sync_error}
+              withLabel
+            />
           </div>
+
+          {/* estimate */}
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-xs text-slate-600">Estimate</span>
+            <EstimateInput value={detail.estimate_points} onChange={handleEstimateChange} />
+            {detail.tp_time_logged > 0 && (
+              <span className="text-[10px] text-emerald-500">
+                {formatEstimate(detail.tp_time_logged)} logged
+              </span>
+            )}
+          </div>
+          {detail.tp_sync_error && (
+            <p className="mt-2 break-words rounded border border-red-900/60 bg-red-950/30 px-2 py-1.5 text-[10px] leading-relaxed text-red-400">
+              {detail.tp_sync_error}
+            </p>
+          )}
         </div>
 
         {/* description */}

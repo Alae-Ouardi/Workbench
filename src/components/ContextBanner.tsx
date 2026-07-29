@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getBriefing, updateProjectContext } from "../api";
 import type { Briefing } from "../types";
+import { TpChip } from "./tp/TpChip";
 
 interface ContextBannerProps {
   projectId: number;
@@ -87,6 +88,15 @@ export function ContextBanner({ projectId, refreshKey, onResume }: ContextBanner
           {collapsed ? "▸" : "▾"}
         </button>
         <span className="font-semibold uppercase tracking-wider text-slate-500">Context</span>
+        {p.tp_user_story_id !== null && (
+          <TpChip
+            entityId={p.tp_user_story_id}
+            label="US"
+            title={`Open user story #${p.tp_user_story_id}${
+              p.tp_user_story_name ? ` — ${p.tp_user_story_name}` : ""
+            } in TargetProcess`}
+          />
+        )}
         {briefing.resume_task && (
           <button
             onClick={() => onResume(briefing.resume_task!.id)}
