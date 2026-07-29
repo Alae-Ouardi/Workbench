@@ -50,7 +50,10 @@ export function SettingsView() {
   const dirty = JSON.stringify(draft) !== JSON.stringify(stripDerived(view));
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 overflow-y-auto p-6">
+    // `h-full` is what makes the scrolling work: without a bounded height this
+    // div sizes to its content, `overflow-y-auto` has nothing to scroll against,
+    // and everything below the fold (the sync queue) is simply clipped away.
+    <div className="mx-auto h-full max-w-2xl space-y-6 overflow-y-auto p-6">
       <header>
         <h1 className="text-base font-semibold text-slate-100">TargetProcess</h1>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
