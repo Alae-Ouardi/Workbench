@@ -191,9 +191,12 @@ Link a TaskBoard project to a TargetProcess user story, and from then on:
 2. In TaskBoard, open the **⚙** panel in the top bar. Enter your instance URL
    (`https://yourco.tpondemand.com`) and the token, then hit **Test connection** — it
    should show your name.
-3. Set the **Done state** to match your workflow (default `Done`). Optionally map
-   `in_progress` and `review` too; leaving those blank means those transitions are not pushed.
-4. Turn on **Push changes to TargetProcess**.
+3. Check the **open → in progress → review → done** state names match your workflow (they
+   default to `In Progress` / `In Review` / `Done`). Clear a field to stop pushing that
+   transition — `open` and `waiting` have no TargetProcess equivalent, since a new entity
+   already starts in its initial state.
+4. Turn on **Push changes to TargetProcess** — a task now moves through TargetProcess the same
+   way it moves through the board, automatically.
 5. Link a project: use the **⋯** menu next to it in the sidebar (or the **⋮** button in the
    menubar popover) and search for its user story. If the project already has tasks, you'll
    be offered to mirror them.

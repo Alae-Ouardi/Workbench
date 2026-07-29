@@ -8,10 +8,8 @@ import {
 } from "../api";
 import type { TpSettings, TpSettingsView } from "../types";
 import { resetTpBaseUrl } from "./tp/TpChip";
+import { StatusMapping } from "./tp/StatusMapping";
 import { SyncQueuePanel } from "./tp/SyncQueuePanel";
-
-/** Blank means "don't sync this transition", which is the default. */
-const OPTIONAL_STATE_HINT = "leave empty to not sync";
 
 export function SettingsView() {
   const [view, setView] = useState<TpSettingsView | null>(null);
@@ -178,38 +176,18 @@ export function SettingsView() {
           <span>
             <span className="block text-xs text-slate-300">Push changes to TargetProcess</span>
             <span className="block text-[10px] text-slate-600">
-              Off keeps everything local. Work still queues, and is pushed when you turn this
+              On: a task moves through TargetProcess the same way it moves through the board —
+              open → in progress → review → done — automatically, using the state names below.
+              Off keeps everything local; work still queues and is pushed once you turn this
               back on.
             </span>
           </span>
         </label>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Done state" hint="required">
-            <input
-              value={draft.done_state_name}
-              onChange={(e) => setDraft({ ...draft, done_state_name: e.target.value })}
-              placeholder="Done"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="In progress state" hint={OPTIONAL_STATE_HINT}>
-            <input
-              value={draft.in_progress_state_name}
-              onChange={(e) => setDraft({ ...draft, in_progress_state_name: e.target.value })}
-              placeholder="In Progress"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Review state" hint={OPTIONAL_STATE_HINT}>
-            <input
-              value={draft.review_state_name}
-              onChange={(e) => setDraft({ ...draft, review_state_name: e.target.value })}
-              placeholder="In Review"
-              className={inputClass}
-            />
-          </Field>
-        </div>
+        <StatusMapping
+          value={draft}
+          onChange={(patch) => setDraft({ ...draft, ...patch })}
+        />
 
         <Field
           label="Timezone offset (minutes east of UTC)"

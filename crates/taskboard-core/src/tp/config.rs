@@ -28,9 +28,12 @@ pub struct TpSettings {
     pub tz_offset_minutes: i32,
     /// TargetProcess state name a completed task moves to.
     pub done_state_name: String,
-    /// Optional state name for `in_progress`. Empty = don't sync that transition.
+    /// TargetProcess state name a task moves to on `in_progress`. Empty = don't
+    /// sync that transition. Defaults to a common workflow name so this syncs
+    /// out of the box; the field exists because instances name states differently.
     pub in_progress_state_name: String,
-    /// Optional state name for `review`. Empty = don't sync that transition.
+    /// TargetProcess state name a task moves to on `review`. Empty = don't sync
+    /// that transition. Same default-on behavior as `in_progress_state_name`.
     pub review_state_name: String,
     /// Cached id of the token's owner, so we don't call `/Context` on every sync.
     /// Cleared whenever the URL or token changes.
@@ -46,8 +49,8 @@ impl Default for TpSettings {
             enabled: false,
             tz_offset_minutes: system_tz_offset_minutes(),
             done_state_name: "Done".to_string(),
-            in_progress_state_name: String::new(),
-            review_state_name: String::new(),
+            in_progress_state_name: "In Progress".to_string(),
+            review_state_name: "In Review".to_string(),
             cached_user_id: None,
             cached_user_name: String::new(),
         }
@@ -394,17 +397,29 @@ mod tests {
         assert_eq!(s.done_state_name, "Done");
     }
 
+    /// The whole open → in_progress → review → done flow syncs out of the box,
+    /// matching the board's own status flow, so enabling the master switch is
+    /// enough — no per-status setup required for the common case.
     #[test]
-    fn state_mapping_only_covers_configured_statuses() {
-        let mut s = TpSettings::default();
+    fn every_reachable_status_syncs_by_default() {
+        let s = TpSettings::default();
+        assert_eq!(s.state_name_for(Status::InProgress), Some("In Progress"));
+        assert_eq!(s.state_name_for(Status::Review), Some("In Review"));
         assert_eq!(s.state_name_for(Status::Done), Some("Done"));
-        // Unconfigured by default, so those transitions are not pushed.
-        assert_eq!(s.state_name_for(Status::InProgress), None);
-        assert_eq!(s.state_name_for(Status::Review), None);
+        // Open/waiting have no TargetProcess counterpart: a freshly created
+        // entity already sits in the initial workflow state.
         assert_eq!(s.state_name_for(Status::Open), None);
         assert_eq!(s.state_name_for(Status::Waiting), None);
+    }
 
-        s.in_progress_state_name = "In Progress".to_string();
-        assert_eq!(s.state_name_for(Status::InProgress), Some("In Progress"));
+    #[test]
+    fn blanking_a_state_name_turns_off_that_transition() {
+        let mut s = TpSettings::default();
+        s.in_progress_state_name = "   ".to_string(); // whitespace counts as blank
+        s.review_state_name = String::new();
+        assert_eq!(s.state_name_for(Status::InProgress), None);
+        assert_eq!(s.state_name_for(Status::Review), None);
+        // Done still has its required, non-blankable default.
+        assert_eq!(s.state_name_for(Status::Done), Some("Done"));
     }
 }
