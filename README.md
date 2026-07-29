@@ -28,9 +28,10 @@ TaskBoard bridges the gap between **you** and your **AI coding assistants**. It'
 - **Request-based projects** — multiple projects per folder, each with its own context and task list
 - **Context banner** — shows the AI's original brief, approved plan, session ID, and handoff state
 - **Project search** — filter projects by name in the sidebar
-- **Menubar popover** — compact view with filter tabs (All · Waiting · Open · In Progress · Review · Done), task search, quick-add, inline edit, and delete
+- **Menubar popover** — compact view with filter tabs (All · Waiting · Open · In Progress · Review · Done), task search, quick-add, inline edit, delete, and a footer showing done/total, summed effort and sync status
 - **Sticky "all done" banner** — appears when every task in a project is complete
 - **Embedded terminal** — shell panel scoped to the selected project's directory
+- **TargetProcess sync** — link a project to a user story and its tasks are mirrored there ([details](#targetprocess-integration))
 - **Live sync** — all windows and tools react to changes instantly
 
 ### CLI
@@ -155,13 +156,13 @@ Give your AI agent this prompt:
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `create_project` | `path`, `name`, `description` | Create a new request-project for a folder |
+| `create_project` | `path`, `name`, `description`, `tp_user_story?` | Create a new request-project for a folder, optionally linked to a TargetProcess user story |
 | `list_projects` | — | List all projects with per-status task counts |
-| `create_tasks` | `project_id`, `tasks[]`, `actor` | Create one or more tasks with dependencies, priorities, assignees |
+| `create_tasks` | `project_id`, `tasks[]`, `actor` | Create one or more tasks with dependencies, priorities, assignees, and `estimate_points` |
 | `list_tasks` | `project?`, `status?`, `assignee?` | List tasks, optionally filtered |
 | `get_task` | `id` | Full task detail: description, dependencies, comments, activity |
 | `update_task_status` | `id`, `status`, `actor` | Move a task (auto-promotes waiting tasks when done) |
-| `update_task` | `id`, `title?`, `description?`, `assignee?`, `priority?` | Edit task fields |
+| `update_task` | `id`, `title?`, `description?`, `assignee?`, `priority?`, `estimate_points?` | Edit task fields |
 | `set_task_dependencies` | `id`, `depends_on[]`, `actor` | Replace a task's dependency set |
 | `add_task_comment` | `id`, `author`, `body` | Add a handoff note or comment |
 | `delete_task` | `id` | Delete a task permanently |
@@ -169,6 +170,56 @@ Give your AI agent this prompt:
 | `set_project_context` | `project_id`, `original_request`, `plan_summary` | Store the north-star context |
 | `save_handoff` | `project_id`, `actor`, `session_id`, `note`, `current_task_id` | Record where you stopped |
 | `delete_project` | `project_id` | Delete a project and all its tasks |
+| `link_project_user_story` | `project_id`, `user_story`, `backfill?` | Link a project to a TargetProcess user story (id or entity URL) |
+| `unlink_project_user_story` | `project_id` | Stop syncing a project; TargetProcess entities are left alone |
+| `tp_sync_status` | — | Whether TargetProcess is configured, and what is queued or failed |
+
+## TargetProcess integration
+
+Link a TaskBoard project to a TargetProcess user story, and from then on:
+
+- tasks created in that project — by you or by an agent — appear as TargetProcess
+  Tasks (or Bugs) under that story;
+- marking a task `done` moves the TargetProcess entity to your done state;
+- the task's `estimate_points` is logged there as time spent, where **1 point = 1 hour**
+  and `0.5` = 30 minutes;
+- every synced project and task shows a clickable TargetProcess id.
+
+### Setup
+
+1. In TargetProcess, go to **My Profile → Access Tokens** and copy a personal access token.
+2. In TaskBoard, open the **⚙** panel in the top bar. Enter your instance URL
+   (`https://yourco.tpondemand.com`) and the token, then hit **Test connection** — it
+   should show your name.
+3. Set the **Done state** to match your workflow (default `Done`). Optionally map
+   `in_progress` and `review` too; leaving those blank means those transitions are not pushed.
+4. Turn on **Push changes to TargetProcess**.
+5. Link a project: use the **⋯** menu next to it in the sidebar (or the **⋮** button in the
+   menubar popover) and search for its user story. If the project already has tasks, you'll
+   be offered to mirror them.
+
+The token is stored in your **macOS Keychain** (service `net.omnevo.taskboard`), never in a
+file. Non-secret settings live in `~/.taskboard/config.json`.
+
+### How syncing behaves
+
+Sync is **local-first**: the board never waits on the network. Changes are queued in the
+database by whichever process made them (app, MCP server, or CLI), and pushed by a
+background worker every ~15s — or immediately with `taskboard tp sync`. Failures are
+retried with exponential backoff and, after 8 attempts, parked for a manual retry. Each
+task carries a badge: amber (queued), green (in sync), red (failed, with the reason). The
+**Sync queue** panel in Settings lists everything outstanding, with per-item Retry and Dismiss.
+
+Time is logged once per task, guarded by what has actually been recorded — reopening and
+re-finishing a task replays the state change but never double-logs its time.
+
+```bash
+taskboard tp status            # connection + queue summary
+taskboard tp link 12345        # link the current project to user story #12345
+taskboard tp sync              # push everything queued now
+taskboard tp queue             # list queued operations and their errors
+taskboard tp retry             # make every failed operation due again
+```
 
 ## Architecture
 
@@ -228,7 +279,13 @@ cargo build -p taskboard-cli --release
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TASKBOARD_DB` | `~/.taskboard/taskboard.db` | Path to the SQLite database |
+| `TASKBOARD_CONFIG` | `~/.taskboard/config.json` | Path to the settings file (TargetProcess URL, state mapping) |
 | `TASKBOARD_ACTOR` | `cli` | Default actor name for CLI actions |
+
+The TargetProcess access token is **not** an environment variable or a config field — it
+lives in the macOS Keychain under service `net.omnevo.taskboard`, account `tp-token`, and is
+set from the Settings panel. On systems without a usable keychain it falls back to
+`~/.taskboard/tp-token.secret` with `0600` permissions.
 
 ## License
 
