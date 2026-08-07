@@ -256,6 +256,15 @@ fn tool_definitions() -> Value {
             }
         },
         {
+            "name": "tp_repush_project",
+            "description": "Re-send a project's already-mirrored tasks to TargetProcess so they pick up their current title and description, and land on the story's team and sprint. Use this after renaming or rewriting tasks that were created earlier, or when existing tasks are missing from the sprint board. Safe to run more than once; it never creates duplicates.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"project_id": {"type": "integer"}},
+                "required": ["project_id"]
+            }
+        },
+        {
             "name": "tp_sync_status",
             "description": "Check the TargetProcess integration: whether it is configured, how many operations are queued or failed, and the error on each failed one. Call this if you need to confirm your tasks reached TargetProcess.",
             "inputSchema": {"type": "object", "properties": {}}
@@ -377,6 +386,15 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
         "unlink_project_user_story" => {
             let project_id = require_i64(args, "project_id")?;
             Ok(serde_json::to_value(db.unlink_tp_project(project_id)?)?)
+        }
+        "tp_repush_project" => {
+            let project_id = require_i64(args, "project_id")?;
+            let queued = db.repush_tp_project(project_id)?;
+            Ok(json!({
+                "queued_operations": queued,
+                "note": "Queued updates are pushed by the TaskBoard app within ~15s, \
+                         or immediately with `taskboard tp sync`.",
+            }))
         }
         "tp_sync_status" => {
             let settings = taskboard_core::TpSettings::load();

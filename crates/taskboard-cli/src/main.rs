@@ -169,6 +169,13 @@ enum TpCommand {
         #[arg(long)]
         no_backfill: bool,
     },
+    /// Re-send existing tasks so TargetProcess picks up their current title,
+    /// description, team and sprint.
+    Repush {
+        /// Project id, path, or name (default: current directory).
+        #[arg(long, short)]
+        project: Option<String>,
+    },
     /// Stop syncing a project. TargetProcess entities are left alone.
     Unlink {
         #[arg(long, short)]
@@ -483,6 +490,23 @@ fn run_tp(db: &Db, command: TpCommand, json: bool) -> Result<()> {
                         "Queued {queued} operation(s) — run `taskboard tp sync` to push them."
                     );
                 }
+            }
+        }
+        TpCommand::Repush { project } => {
+            let project = resolve_project(db, project)?;
+            let queued = db.repush_tp_project(project.id)?;
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({ "project": project.name, "queued_operations": queued })
+                );
+            } else if queued == 0 {
+                println!("'{}' has no mirrored tasks to re-push.", project.name);
+            } else {
+                println!(
+                    "Queued {queued} update(s) for '{}' — run `taskboard tp sync` to push them.",
+                    project.name
+                );
             }
         }
         TpCommand::Unlink { project } => {

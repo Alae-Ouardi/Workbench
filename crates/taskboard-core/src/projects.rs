@@ -9,11 +9,12 @@ use crate::types::{Briefing, Project, ProjectSummary, Status, Task, TaskFilter};
 /// All `projects` columns, in the order `row_to_project` expects them.
 const PROJECT_COLUMNS: &str = "id, name, path, created_at, original_request, plan_summary, \
      last_actor, last_session_id, handoff_note, current_task_id, handoff_updated_at, \
-     tp_user_story_id, tp_user_story_name, tp_project_id, tp_process_id, tp_sync_enabled";
+     tp_user_story_id, tp_user_story_name, tp_project_id, tp_process_id, \
+     tp_team_id, tp_team_iteration_id, tp_sync_enabled";
 
 /// Number of columns in `PROJECT_COLUMNS`, i.e. the first free index for extra
 /// selected expressions in queries that append to it.
-const PROJECT_COLUMN_COUNT: usize = 16;
+const PROJECT_COLUMN_COUNT: usize = 18;
 
 /// Resolve a filesystem path to a canonical project root: the enclosing git
 /// repository root if one exists, otherwise the canonicalized path itself.
@@ -324,6 +325,8 @@ fn row_to_project(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
         tp_user_story_name: row.get(12)?,
         tp_project_id: row.get(13)?,
         tp_process_id: row.get(14)?,
-        tp_sync_enabled: row.get(15)?,
+        tp_team_id: row.get(15)?,
+        tp_team_iteration_id: row.get(16)?,
+        tp_sync_enabled: row.get(17)?,
     })
 }

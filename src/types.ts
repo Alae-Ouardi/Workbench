@@ -29,6 +29,10 @@ export interface Project {
   tp_user_story_name: string;
   tp_project_id: number | null;
   tp_process_id: number | null;
+  /** Team of the linked story, copied onto mirrored entities. */
+  tp_team_id: number | null;
+  /** Sprint of the linked story, copied onto mirrored entities. */
+  tp_team_iteration_id: number | null;
   tp_sync_enabled: boolean;
 }
 

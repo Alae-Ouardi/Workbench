@@ -125,10 +125,29 @@ impl Db {
                     project.tp_project_id,
                     &task.title,
                     &task.description,
+                    project.tp_team_id,
+                    project.tp_team_iteration_id,
                 )?;
                 self.conn.execute(
                     "UPDATE tasks SET tp_entity_id = ?1 WHERE id = ?2",
                     params![entity_id, task.id],
+                )?;
+                Ok(Outcome::Done)
+            }
+            SyncOp::UpdateEntity => {
+                let Some(entity_id) = task.tp_entity_id else {
+                    // The create sits earlier in the queue; a retry will find it.
+                    return Err(Error::Tp(
+                        "waiting for the TargetProcess entity to be created".to_string(),
+                    ));
+                };
+                client.update_entity(
+                    &task.tp_entity_type,
+                    entity_id,
+                    &task.title,
+                    &task.description,
+                    project.tp_team_id,
+                    project.tp_team_iteration_id,
                 )?;
                 Ok(Outcome::Done)
             }
@@ -234,7 +253,7 @@ impl Db {
     // ------------------------------------------------------------------- links
 
     /// Link a project to a user story, fetching the story to capture its name,
-    /// TargetProcess project and process in one go.
+    /// TargetProcess project, process, team and sprint in one go.
     pub fn link_tp_project(&self, project_id: i64, user_story_id: i64) -> Result<Project> {
         let settings = TpSettings::load();
         let client = TpClient::from_settings(&settings)?;
@@ -244,20 +263,64 @@ impl Db {
     }
 
     pub(crate) fn store_tp_link(&self, project_id: i64, story: &TpUserStory) -> Result<()> {
+        // The story's team and sprint are captured here so mirroring a batch of
+        // tasks costs no extra round trips.
         self.conn.execute(
             "UPDATE projects
              SET tp_user_story_id = ?1, tp_user_story_name = ?2, tp_project_id = ?3,
-                 tp_process_id = ?4, tp_sync_enabled = 1
-             WHERE id = ?5",
+                 tp_process_id = ?4, tp_team_id = ?5, tp_team_iteration_id = ?6,
+                 tp_sync_enabled = 1
+             WHERE id = ?7",
             params![
                 story.id,
                 story.name,
                 story.project_id,
                 story.process_id,
+                story.team_id,
+                story.team_iteration_id,
                 project_id
             ],
         )?;
         Ok(())
+    }
+
+    /// Re-push every already-mirrored task of a project: title, description,
+    /// team and sprint.
+    ///
+    /// The story is re-read first, so a project linked before team and sprint
+    /// were captured picks them up without being unlinked and linked again.
+    /// Returns how many operations were queued.
+    pub fn repush_tp_project(&self, project_id: i64) -> Result<usize> {
+        let project = self.project_by_id(project_id)?;
+        let Some(user_story_id) = project.tp_user_story_id else {
+            return Err(Error::Tp(
+                "this project is not linked to a user story".to_string(),
+            ));
+        };
+
+        // Refresh the stored link so team/sprint are current before queueing.
+        let settings = TpSettings::load();
+        let client = TpClient::from_settings(&settings)?;
+        let story = client.get_user_story(user_story_id)?;
+        self.store_tp_link(project_id, &story)?;
+
+        let task_ids: Vec<i64> = {
+            let mut stmt = self.conn.prepare(
+                "SELECT id FROM tasks WHERE project_id = ?1 AND tp_entity_id IS NOT NULL ORDER BY id",
+            )?;
+            let rows = stmt.query_map(params![project_id], |row| row.get(0))?;
+            rows.collect::<std::result::Result<_, _>>()?
+        };
+
+        for task_id in &task_ids {
+            self.enqueue_task_op(
+                SyncOp::UpdateEntity,
+                project_id,
+                *task_id,
+                &serde_json::json!({}),
+            )?;
+        }
+        Ok(task_ids.len())
     }
 
     /// Unlink a project. Queued work for it is dropped — it would target a story
@@ -267,7 +330,8 @@ impl Db {
         self.conn.execute(
             "UPDATE projects
              SET tp_user_story_id = NULL, tp_user_story_name = '', tp_project_id = NULL,
-                 tp_process_id = NULL, tp_sync_enabled = 0
+                 tp_process_id = NULL, tp_team_id = NULL, tp_team_iteration_id = NULL,
+                 tp_sync_enabled = 0
              WHERE id = ?1",
             params![project_id],
         )?;
@@ -328,6 +392,7 @@ enum Outcome {
 mod tests {
     use super::*;
     use crate::types::{Kind, NewTask, Priority};
+    use crate::TaskUpdate;
 
     fn task_fixture() -> Task {
         Task {
@@ -379,6 +444,8 @@ mod tests {
                 project_id: Some(3),
                 process_id: Some(9),
                 project_name: "Evo".into(),
+                team_id: Some(77),
+                team_iteration_id: Some(88),
             },
         )
         .unwrap();
@@ -391,6 +458,129 @@ mod tests {
             .into_iter()
             .map(|i| i.kind)
             .collect()
+    }
+
+    #[test]
+    fn linking_captures_the_story_team_and_sprint() {
+        let db = Db::open_in_memory().unwrap();
+        let pid = linked_project(&db, "/tmp/linked-team");
+        let project = db.project_by_id(pid).unwrap();
+        // Mirrored entities need both: TargetProcess tasks inherit neither, and
+        // the sprint is refused without the team.
+        assert_eq!(project.tp_team_id, Some(77));
+        assert_eq!(project.tp_team_iteration_id, Some(88));
+    }
+
+    #[test]
+    fn unlinking_clears_the_team_and_sprint() {
+        let db = Db::open_in_memory().unwrap();
+        let pid = linked_project(&db, "/tmp/unlink-team");
+        db.unlink_tp_project(pid).unwrap();
+        let project = db.project_by_id(pid).unwrap();
+        assert_eq!(project.tp_team_id, None);
+        assert_eq!(project.tp_team_iteration_id, None);
+    }
+
+    /// Renaming a mirrored task has to reach TargetProcess — otherwise the board
+    /// keeps the title the task was created with.
+    #[test]
+    fn editing_a_mirrored_task_queues_an_update() {
+        let db = Db::open_in_memory().unwrap();
+        let pid = linked_project(&db, "/tmp/linked-edit");
+        let t = db
+            .create_task(
+                pid,
+                &NewTask {
+                    title: "before".into(),
+                    ..Default::default()
+                },
+                "me",
+            )
+            .unwrap();
+        // Pretend the create already landed.
+        db.conn
+            .execute(
+                "UPDATE tasks SET tp_entity_id = 4242 WHERE id = ?1",
+                params![t.id],
+            )
+            .unwrap();
+
+        db.update_task(
+            t.id,
+            &TaskUpdate {
+                title: Some("after".into()),
+                ..Default::default()
+            },
+            "me",
+        )
+        .unwrap();
+
+        assert_eq!(queue_kinds(&db), vec!["create_entity", "update_entity"]);
+    }
+
+    /// Fields TargetProcess does not mirror must not generate traffic.
+    #[test]
+    fn editing_a_local_only_field_queues_nothing() {
+        let db = Db::open_in_memory().unwrap();
+        let pid = linked_project(&db, "/tmp/linked-local-edit");
+        let t = db
+            .create_task(
+                pid,
+                &NewTask {
+                    title: "t".into(),
+                    ..Default::default()
+                },
+                "me",
+            )
+            .unwrap();
+        db.conn
+            .execute(
+                "UPDATE tasks SET tp_entity_id = 4242 WHERE id = ?1",
+                params![t.id],
+            )
+            .unwrap();
+
+        db.update_task(
+            t.id,
+            &TaskUpdate {
+                assignee: Some("someone".into()),
+                ..Default::default()
+            },
+            "me",
+        )
+        .unwrap();
+
+        assert_eq!(queue_kinds(&db), vec!["create_entity"]);
+    }
+
+    /// A task that was never mirrored needs no update: its create carries the
+    /// current title and description anyway.
+    #[test]
+    fn editing_an_unmirrored_task_queues_no_update() {
+        let db = Db::open_in_memory().unwrap();
+        let pid = linked_project(&db, "/tmp/linked-unmirrored-edit");
+        let t = db
+            .create_task(
+                pid,
+                &NewTask {
+                    title: "before".into(),
+                    ..Default::default()
+                },
+                "me",
+            )
+            .unwrap();
+
+        db.update_task(
+            t.id,
+            &TaskUpdate {
+                title: Some("after".into()),
+                ..Default::default()
+            },
+            "me",
+        )
+        .unwrap();
+
+        assert_eq!(queue_kinds(&db), vec!["create_entity"]);
     }
 
     #[test]
@@ -622,6 +812,8 @@ mod tests {
                 project_id: Some(3),
                 process_id: Some(9),
                 project_name: "Evo".into(),
+                team_id: Some(77),
+                team_iteration_id: Some(88),
             },
         )
         .unwrap();
@@ -758,6 +950,8 @@ mod tests {
             project_id: Some(3),
             process_id: Some(9),
             project_name: "Evo".into(),
+            team_id: Some(77),
+            team_iteration_id: Some(88),
         };
         db.store_tp_link(p.id, &story).unwrap();
 

@@ -42,6 +42,13 @@ pub struct TpUserStory {
     pub project_name: String,
     /// Process the story's project uses — needed to resolve workflow states.
     pub process_id: Option<i64>,
+    /// Team the story is assigned to. Tasks do not inherit it, so it is copied
+    /// onto every entity we mirror — without it the sprint cannot be set at all.
+    #[serde(default)]
+    pub team_id: Option<i64>,
+    /// Sprint the story sits in. Also not inherited by tasks.
+    #[serde(default)]
+    pub team_iteration_id: Option<i64>,
 }
 
 /// One workflow state of a process, for a single entity type.
@@ -199,7 +206,7 @@ impl TpClient {
     // ------------------------------------------------------------ user stories
 
     const USER_STORY_INCLUDE: &'static str =
-        "[Id,Name,EntityState[Name],Project[Id,Name,Process[Id]]]";
+        "[Id,Name,EntityState[Name],Project[Id,Name,Process[Id]],Team[Id],TeamIteration[Id]]";
 
     /// Search user stories by name, or fetch one directly when the query is an
     /// id or a pasted `…/entity/<id>` URL.
@@ -243,6 +250,10 @@ impl TpClient {
     ///
     /// Both collections accept a `UserStory` link, which is what puts the entity
     /// under the story on the board.
+    ///
+    /// `team_id` and `team_iteration_id` come from the story: TargetProcess tasks
+    /// inherit neither, so without them the entity lands off the sprint board.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_entity(
         &self,
         entity_type: &str,
@@ -250,6 +261,8 @@ impl TpClient {
         tp_project_id: Option<i64>,
         name: &str,
         description: &str,
+        team_id: Option<i64>,
+        team_iteration_id: Option<i64>,
     ) -> Result<i64> {
         let mut body = serde_json::json!({
             "Name": name,
@@ -261,8 +274,37 @@ impl TpClient {
         if let Some(pid) = tp_project_id {
             body["Project"] = serde_json::json!({ "Id": pid });
         }
+        apply_team_fields(&mut body, team_id, team_iteration_id);
         let response = self.post_json(&collection_of(entity_type), body)?;
         require_id(&response, "entity was not created")
+    }
+
+    /// Update an entity that already exists in TargetProcess.
+    ///
+    /// Used both to push local edits (a renamed task, a rewritten description)
+    /// and to repair entities created before team/sprint were sent. Sending the
+    /// same values again is harmless, so it is safe to replay.
+    pub fn update_entity(
+        &self,
+        entity_type: &str,
+        entity_id: i64,
+        name: &str,
+        description: &str,
+        team_id: Option<i64>,
+        team_iteration_id: Option<i64>,
+    ) -> Result<()> {
+        let mut body = serde_json::json!({ "Name": name });
+        // An empty description is left alone rather than blanking whatever is
+        // already on the board.
+        if !description.trim().is_empty() {
+            body["Description"] = serde_json::Value::String(description.to_string());
+        }
+        apply_team_fields(&mut body, team_id, team_iteration_id);
+        self.post_json(
+            &format!("{}/{entity_id}", collection_of(entity_type)),
+            body,
+        )?;
+        Ok(())
     }
 
     /// Workflow states of `entity_type` in `process_id`, ordered as the process
@@ -516,6 +558,25 @@ fn str_field(value: &serde_json::Value, key: &str) -> String {
         .to_string()
 }
 
+/// Add `Team` / `TeamIteration` to a create or update payload.
+///
+/// A TeamIteration belongs to a team, so TargetProcess rejects a sprint on an
+/// entity that has no team — they are always sent together, and the sprint is
+/// dropped when the team is unknown rather than failing the whole write.
+fn apply_team_fields(
+    body: &mut serde_json::Value,
+    team_id: Option<i64>,
+    team_iteration_id: Option<i64>,
+) {
+    let Some(team_id) = team_id else {
+        return;
+    };
+    body["Team"] = serde_json::json!({ "Id": team_id });
+    if let Some(iteration_id) = team_iteration_id {
+        body["TeamIteration"] = serde_json::json!({ "Id": iteration_id });
+    }
+}
+
 fn user_story_from_json(item: &serde_json::Value) -> TpUserStory {
     let project = item.get("Project");
     TpUserStory {
@@ -530,6 +591,14 @@ fn user_story_from_json(item: &serde_json::Value) -> TpUserStory {
         process_id: project
             .and_then(|p| p.get("Process"))
             .and_then(|pr| pr.get("Id"))
+            .and_then(|v| v.as_i64()),
+        team_id: item
+            .get("Team")
+            .and_then(|t| t.get("Id"))
+            .and_then(|v| v.as_i64()),
+        team_iteration_id: item
+            .get("TeamIteration")
+            .and_then(|t| t.get("Id"))
             .and_then(|v| v.as_i64()),
     }
 }
@@ -749,7 +818,9 @@ mod tests {
             "Id": 12,
             "Name": "Login screen",
             "EntityState": { "Name": "In Progress" },
-            "Project": { "Id": 3, "Name": "Evo", "Process": { "Id": 9 } }
+            "Project": { "Id": 3, "Name": "Evo", "Process": { "Id": 9 } },
+            "Team": { "Id": 77 },
+            "TeamIteration": { "Id": 88 }
         }));
         assert_eq!(
             story,
@@ -760,6 +831,8 @@ mod tests {
                 project_id: Some(3),
                 project_name: "Evo".into(),
                 process_id: Some(9),
+                team_id: Some(77),
+                team_iteration_id: Some(88),
             }
         );
 
@@ -768,5 +841,8 @@ mod tests {
         assert_eq!(sparse.project_id, None);
         assert_eq!(sparse.process_id, None);
         assert_eq!(sparse.state_name, "");
+        // A story with no team or sprint is normal; the fields simply stay empty.
+        assert_eq!(sparse.team_id, None);
+        assert_eq!(sparse.team_iteration_id, None);
     }
 }

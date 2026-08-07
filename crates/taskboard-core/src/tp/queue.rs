@@ -24,6 +24,9 @@ const MAX_BACKOFF_SECS: i64 = 3600;
 pub enum SyncOp {
     /// Mirror a TaskBoard task into TargetProcess.
     CreateEntity,
+    /// Push the task's title, description, team and sprint onto the entity that
+    /// already mirrors it.
+    UpdateEntity,
     /// Move the mirrored entity to the state mapped from a TaskBoard status.
     SetState,
     /// Log the task's estimate as a time entry.
@@ -34,6 +37,7 @@ impl SyncOp {
     pub fn as_str(&self) -> &'static str {
         match self {
             SyncOp::CreateEntity => "create_entity",
+            SyncOp::UpdateEntity => "update_entity",
             SyncOp::SetState => "set_state",
             SyncOp::LogTime => "log_time",
         }
@@ -42,6 +46,7 @@ impl SyncOp {
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "create_entity" => Some(SyncOp::CreateEntity),
+            "update_entity" => Some(SyncOp::UpdateEntity),
             "set_state" => Some(SyncOp::SetState),
             "log_time" => Some(SyncOp::LogTime),
             _ => None,
@@ -52,6 +57,7 @@ impl SyncOp {
     pub fn label(&self) -> &'static str {
         match self {
             SyncOp::CreateEntity => "Create in TargetProcess",
+            SyncOp::UpdateEntity => "Update title, description and sprint",
             SyncOp::SetState => "Update state",
             SyncOp::LogTime => "Log time",
         }

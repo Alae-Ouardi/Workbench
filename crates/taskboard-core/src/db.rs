@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 
 use crate::error::Result;
 
@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS projects (
     tp_user_story_name TEXT NOT NULL DEFAULT '',
     tp_project_id      INTEGER,
     tp_process_id      INTEGER,
+    -- Team and sprint of the linked user story. TargetProcess tasks inherit
+    -- neither, so they are copied onto every mirrored entity; kept here so a
+    -- batch of tasks costs no extra lookups.
+    tp_team_id           INTEGER,
+    tp_team_iteration_id INTEGER,
     tp_sync_enabled    INTEGER NOT NULL DEFAULT 0
 );
 
@@ -78,7 +83,7 @@ CREATE TABLE IF NOT EXISTS task_events (
 CREATE TABLE IF NOT EXISTS tp_sync_queue (
     id              INTEGER PRIMARY KEY,
     kind            TEXT NOT NULL
-                    CHECK (kind IN ('create_entity','set_state','log_time')),
+                    CHECK (kind IN ('create_entity','update_entity','set_state','log_time')),
     project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     task_id         INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
     payload         TEXT NOT NULL DEFAULT '{}',
@@ -181,6 +186,9 @@ fn migrate(conn: &Connection) -> Result<()> {
             ("tp_user_story_name", "TEXT NOT NULL DEFAULT ''"),
             ("tp_project_id", "INTEGER"),
             ("tp_process_id", "INTEGER"),
+            // Team and sprint of the linked story, copied onto mirrored entities.
+            ("tp_team_id", "INTEGER"),
+            ("tp_team_iteration_id", "INTEGER"),
             ("tp_sync_enabled", "INTEGER NOT NULL DEFAULT 0"),
         ],
     )?;
@@ -201,6 +209,57 @@ fn migrate(conn: &Connection) -> Result<()> {
         ],
     )?;
     migrate_remove_path_unique(conn)?;
+    migrate_queue_kinds(conn)?;
+    Ok(())
+}
+
+/// `kind` is guarded by a table-level CHECK, which SQLite cannot alter. A
+/// database created before `update_entity` existed would reject that kind
+/// outright, so the table is recreated with the current constraint and its
+/// pending rows carried over.
+fn migrate_queue_kinds(conn: &Connection) -> Result<()> {
+    let sql: Option<String> = conn
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tp_sync_queue'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(sql) = sql else {
+        return Ok(()); // fresh database: SCHEMA already has the current constraint
+    };
+    if sql.contains("update_entity") {
+        return Ok(());
+    }
+
+    conn.pragma_update(None, "foreign_keys", "OFF")?;
+    conn.execute_batch(
+        "CREATE TABLE tp_sync_queue_new (
+            id              INTEGER PRIMARY KEY,
+            kind            TEXT NOT NULL
+                            CHECK (kind IN ('create_entity','update_entity','set_state','log_time')),
+            project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            task_id         INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+            payload         TEXT NOT NULL DEFAULT '{}',
+            attempts        INTEGER NOT NULL DEFAULT 0,
+            last_error      TEXT NOT NULL DEFAULT '',
+            next_attempt_at TEXT NOT NULL,
+            created_at      TEXT NOT NULL
+        );
+        INSERT INTO tp_sync_queue_new (
+            id, kind, project_id, task_id, payload, attempts, last_error,
+            next_attempt_at, created_at
+        )
+        SELECT
+            id, kind, project_id, task_id, payload, attempts, last_error,
+            next_attempt_at, created_at
+        FROM tp_sync_queue;
+        DROP TABLE tp_sync_queue;
+        ALTER TABLE tp_sync_queue_new RENAME TO tp_sync_queue;
+        CREATE INDEX IF NOT EXISTS idx_tp_queue_due ON tp_sync_queue(next_attempt_at);
+        CREATE INDEX IF NOT EXISTS idx_tp_queue_task ON tp_sync_queue(task_id);",
+    )?;
+    conn.pragma_update(None, "foreign_keys", "ON")?;
     Ok(())
 }
 
@@ -256,19 +315,23 @@ fn migrate_remove_path_unique(conn: &Connection) -> Result<()> {
             tp_user_story_name TEXT NOT NULL DEFAULT '',
             tp_project_id      INTEGER,
             tp_process_id      INTEGER,
+            tp_team_id           INTEGER,
+            tp_team_iteration_id INTEGER,
             tp_sync_enabled    INTEGER NOT NULL DEFAULT 0
         );
         INSERT INTO projects_new (
             id, name, path, created_at, original_request, plan_summary,
             last_actor, last_session_id, handoff_note, current_task_id,
             handoff_updated_at, tp_user_story_id, tp_user_story_name,
-            tp_project_id, tp_process_id, tp_sync_enabled
+            tp_project_id, tp_process_id, tp_team_id, tp_team_iteration_id,
+            tp_sync_enabled
         )
         SELECT
             id, name, path, created_at, original_request, plan_summary,
             last_actor, last_session_id, handoff_note, current_task_id,
             handoff_updated_at, tp_user_story_id, tp_user_story_name,
-            tp_project_id, tp_process_id, tp_sync_enabled
+            tp_project_id, tp_process_id, tp_team_id, tp_team_iteration_id,
+            tp_sync_enabled
         FROM projects;
         DROP TABLE projects;
         ALTER TABLE projects_new RENAME TO projects;",

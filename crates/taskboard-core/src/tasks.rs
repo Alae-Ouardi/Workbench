@@ -275,8 +275,37 @@ impl Db {
         }
         self.record_event(id, actor, "updated", "")?;
         let task = self.get_task_row(id)?;
+        // Title and description are the two fields TargetProcess mirrors, so an
+        // edit to either has to be pushed — otherwise the board keeps the text
+        // the task was created with. Other fields are local-only.
+        if update.title.is_some() || update.description.is_some() {
+            self.enqueue_tp_update(&task)?;
+        }
         tx.commit()?;
         Ok(task)
+    }
+
+    /// Push a mirrored task's current title, description, team and sprint.
+    ///
+    /// Skipped when the task has never been mirrored: its `create_entity` will
+    /// send the current values anyway.
+    pub(crate) fn enqueue_tp_update(&self, task: &Task) -> Result<()> {
+        if task.tp_entity_id.is_none() {
+            return Ok(());
+        }
+        let Some(project) = self.tp_target(task.project_id)? else {
+            return Ok(());
+        };
+        if project.tp_user_story_id.is_none() {
+            return Ok(());
+        }
+        self.enqueue_task_op(
+            crate::tp::queue::SyncOp::UpdateEntity,
+            task.project_id,
+            task.id,
+            &serde_json::json!({}),
+        )?;
+        Ok(())
     }
 
     pub fn delete_task(&self, id: i64) -> Result<()> {

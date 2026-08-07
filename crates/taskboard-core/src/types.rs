@@ -158,6 +158,14 @@ pub struct Project {
     pub tp_project_id: Option<i64>,
     /// TargetProcess process id — required to resolve workflow states.
     pub tp_process_id: Option<i64>,
+    /// Team the linked story belongs to. Copied onto every mirrored entity:
+    /// TargetProcess tasks do not inherit it, and a sprint cannot be set
+    /// without it.
+    #[serde(default)]
+    pub tp_team_id: Option<i64>,
+    /// Sprint the linked story sits in, likewise copied onto mirrored entities.
+    #[serde(default)]
+    pub tp_team_iteration_id: Option<i64>,
     /// Whether changes to this project are pushed to TargetProcess.
     pub tp_sync_enabled: bool,
 }
