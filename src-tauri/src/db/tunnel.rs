@@ -161,9 +161,12 @@ pub fn delete_pod_quick(context: &str, namespace: &str, pod: &str) {
     }
 }
 
-pub fn wait_running(context: &str, namespace: &str, pod: &str) -> Result<(), String> {
+pub fn wait_running(context: &str, namespace: &str, pod: &str, cancelled: impl Fn() -> bool) -> Result<(), String> {
     let deadline = Instant::now() + POD_READY_TIMEOUT;
     loop {
+        if cancelled() {
+            return Err(super::session::CANCELLED.into());
+        }
         match pod_phase(context, namespace, pod)?.as_deref() {
             Some("Running") => return Ok(()),
             Some("Failed") | Some("Succeeded") => return Err("The relay pod stopped right after starting. Check its events in the Kubernetes view.".into()),

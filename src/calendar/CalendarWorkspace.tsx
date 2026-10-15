@@ -27,7 +27,7 @@ const rangeTitle = (days: Date[]) => {
 };
 
 export function CalendarWorkspace() {
-  const { access, request } = useCalendarAccess();
+  const { access, prompt, request } = useCalendarAccess();
   const [mode, setMode] = useLocalState<Mode>("calendar.mode", "week");
   const [hiddenList, setHiddenList] = useLocalState<string[]>("calendar.hidden", []);
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
@@ -173,7 +173,7 @@ export function CalendarWorkspace() {
         </header>
 
         {access === null ? null : access !== "granted" ? (
-          <AccessPrompt access={access} onRequest={() => void request()} />
+          <AccessPrompt access={access} prompt={prompt} onRequest={() => void request()} />
         ) : (
           <div className="flex min-h-0 flex-1">
             <div className="flex min-w-0 flex-1 flex-col">
@@ -188,7 +188,7 @@ export function CalendarWorkspace() {
   );
 }
 
-function AccessPrompt({ access, onRequest }: { access: string; onRequest: () => void }) {
+function AccessPrompt({ access, prompt, onRequest }: { access: string; prompt: "idle" | "asking" | "no-prompt"; onRequest: () => void }) {
   return (
     <div className="flex flex-1 items-center justify-center p-8">
       <div className="glass max-w-md rounded-2xl p-6 text-center">
@@ -200,10 +200,24 @@ function AccessPrompt({ access, onRequest }: { access: string; onRequest: () => 
           Workbench reads the calendars on this Mac — including Outlook/Exchange once your work account is added in System
           Settings › Internet Accounts. It never changes them.
         </p>
-        {access === "not_determined" ? (
-          <button className="btn btn-primary mt-4" onClick={onRequest}>
-            Allow calendar access
+        {access === "not_determined" && prompt !== "no-prompt" ? (
+          <button className="btn btn-primary mt-4" onClick={onRequest} disabled={prompt === "asking"}>
+            {prompt === "asking" ? "Waiting for your answer in macOS…" : "Allow calendar access"}
           </button>
+        ) : access === "not_determined" ? (
+          <>
+            <p className="mt-3 text-xs text-amber-300">
+              macOS did not show its permission prompt. Add Workbench under Privacy &amp; Security › Calendars (Full Access), then come back.
+            </p>
+            <div className="mt-3 flex justify-center gap-2">
+              <button className="btn" onClick={openCalendarPrivacy}>
+                Open Calendar privacy settings
+              </button>
+              <button className="btn" onClick={onRequest}>
+                Try again
+              </button>
+            </div>
+          </>
         ) : (
           <>
             <p className="mt-3 text-xs text-amber-300">

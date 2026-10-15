@@ -3,10 +3,9 @@
 // (and connects) it.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EnvBadge } from "../../shared/EnvBadge";
-import { envTier } from "../../shared/envKind";
 import { IconDatabase, IconSearch } from "../../shared/icons";
-import { displayName, groupByFolder, resolveTarget, searchConnections } from "../logic/connections";
+import { ConnBadge } from "../components/ConnBadge";
+import { displayName, groupByFolder, searchConnections, targetLine } from "../logic/connections";
 import type { Connection, ConnectionsFile, Folder, SessionInfo } from "../types";
 
 interface Props {
@@ -184,7 +183,7 @@ function Row({
   onHover?: () => void;
   compact?: boolean;
 }) {
-  const { context, namespace } = resolveTarget(c);
+  const where = targetLine(c);
   return (
     <div
       data-row={index}
@@ -194,14 +193,14 @@ function Row({
         active ? "border-[var(--line-strong)] bg-[var(--line)]" : "border-transparent hover:bg-[var(--line-soft)]"
       }`}
     >
-      <EnvBadge tier={envTier(c.env)} />
+      <ConnBadge connection={c} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="num truncate text-[13px] font-medium text-slate-100">{displayName(c)}</span>
           {folder && <span className="truncate text-[11px] text-slate-500">{folder}</span>}
         </div>
-        <div className="num truncate text-[10.5px] text-slate-500" title={`${namespace} on ${context}`}>
-          {namespace} · {context}
+        <div className="num truncate text-[10.5px] text-slate-500" title={where}>
+          {where}
         </div>
       </div>
       <span className="num text-[11px] text-slate-500">:{c.local_port}</span>

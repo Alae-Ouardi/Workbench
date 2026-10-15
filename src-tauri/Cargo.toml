@@ -26,6 +26,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 taskboard-core = { workspace = true }
+keyring = { workspace = true }
 notify = "6"
 notify-debouncer-mini = "0.4"
 portable-pty = "0.8"

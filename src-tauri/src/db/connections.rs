@@ -1,6 +1,7 @@
 //! Saved database connections, grouped in client folders, stored in
-//! `~/.workbench/connections.json`. No credentials are stored: they are read
-//! from the cluster secret on every connect.
+//! `~/.workbench/connections.json`. No credentials are stored here: cluster
+//! ones are read from the cluster secret on every connect, local passwords
+//! live in the macOS Keychain (see `local`).
 
 use std::path::PathBuf;
 
@@ -18,8 +19,21 @@ pub struct Folder {
     pub name: String,
 }
 
+/// Where the database runs: behind a relay pod in a cluster, or reachable
+/// directly (this Mac, Docker, a VPN host).
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    #[default]
+    Cluster,
+    Local,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Connection {
+    /// Missing in files saved before local connections existed: cluster.
+    #[serde(default)]
+    pub kind: Kind,
     pub id: String,
     pub folder_id: String,
     /// Display name; defaults to the environment in the UI.
@@ -27,7 +41,15 @@ pub struct Connection {
     /// latest, review, uat, preprod or prod.
     pub env: String,
     pub client: String,
+    /// Cluster: the tunnel's port on this Mac. Local: the database port.
     pub local_port: u16,
+    /// Local only: database host, user and schema.
+    #[serde(default)]
+    pub host: String,
+    #[serde(default)]
+    pub user: String,
+    #[serde(default)]
+    pub database: String,
     #[serde(default = "default_domain")]
     pub cluster_domain: String,
     /// Overrides the context derived from env/client (shared clusters).
@@ -130,31 +152,58 @@ pub fn validate(file: &ConnectionsFile) -> Result<(), String> {
         if !ENVIRONMENTS.contains(&c.env.as_str()) {
             return Err(format!("{label}: environment must be one of {}.", ENVIRONMENTS.join(", ")));
         }
-        if !is_slug(&c.client) {
-            return Err(format!("{label}: the client must be lowercase letters, digits or dashes."));
-        }
-        if c.local_port < 1024 {
-            return Err(format!("{label}: pick a local port of 1024 or above."));
-        }
-        if let Some(other) = ports.insert(c.local_port, label.clone()) {
-            return Err(format!("{label} and {other} both use local port {}.", c.local_port));
-        }
-        if let Some(ns) = c.namespace.as_deref().filter(|s| !s.trim().is_empty()) {
-            if !is_slug(ns.trim()) {
-                return Err(format!("{label}: the namespace is not a valid name."));
+        match c.kind {
+            Kind::Local => validate_local(c, label)?,
+            Kind::Cluster => {
+                validate_cluster(c, label)?;
+                if let Some(other) = ports.insert(c.local_port, label.clone()) {
+                    return Err(format!("{label} and {other} both use local port {}.", c.local_port));
+                }
             }
-        }
-        if let Some(ctx) = c.context.as_deref() {
-            if ctx.trim().starts_with('-') || ctx.chars().any(char::is_control) {
-                return Err(format!("{label}: the context is not a valid name."));
-            }
-        }
-        if !is_slug(&c.secret) && !c.secret.contains('.') {
-            return Err(format!("{label}: the secret name is not valid."));
         }
     }
     if !file.relay_pod.trim().is_empty() && !is_slug(file.relay_pod.trim()) {
         return Err("The relay pod name must be lowercase letters, digits or dashes.".into());
+    }
+    Ok(())
+}
+
+fn validate_cluster(c: &Connection, label: &str) -> Result<(), String> {
+    if !is_slug(&c.client) {
+        return Err(format!("{label}: the client must be lowercase letters, digits or dashes."));
+    }
+    if c.local_port < 1024 {
+        return Err(format!("{label}: pick a local port of 1024 or above."));
+    }
+    if let Some(ns) = c.namespace.as_deref().filter(|s| !s.trim().is_empty()) {
+        if !is_slug(ns.trim()) {
+            return Err(format!("{label}: the namespace is not a valid name."));
+        }
+    }
+    if let Some(ctx) = c.context.as_deref() {
+        if ctx.trim().starts_with('-') || ctx.chars().any(char::is_control) {
+            return Err(format!("{label}: the context is not a valid name."));
+        }
+    }
+    if !is_slug(&c.secret) && !c.secret.contains('.') {
+        return Err(format!("{label}: the secret name is not valid."));
+    }
+    Ok(())
+}
+
+fn validate_local(c: &Connection, label: &str) -> Result<(), String> {
+    let host = c.host.trim();
+    if host.is_empty() || host.contains(char::is_whitespace) || host.chars().any(char::is_control) {
+        return Err(format!("{label}: enter the database host, e.g. 127.0.0.1."));
+    }
+    if c.local_port == 0 {
+        return Err(format!("{label}: enter the database port."));
+    }
+    if c.user.trim().is_empty() {
+        return Err(format!("{label}: enter the database user."));
+    }
+    if c.database.trim().is_empty() {
+        return Err(format!("{label}: enter the database name."));
     }
     Ok(())
 }
@@ -191,7 +240,26 @@ pub async fn db_connections_get() -> Result<ConnectionsFile, String> {
 
 #[tauri::command]
 pub async fn db_connections_save(file: ConnectionsFile) -> Result<(), String> {
-    blocking(move || save(&file)).await
+    blocking(move || {
+        let before = load().unwrap_or_default();
+        save(&file)?;
+        // A deleted local connection takes its Keychain password with it.
+        for gone in removed_local(&before, &file) {
+            let _ = super::local::set_password(&gone, "");
+        }
+        Ok(())
+    })
+    .await
+}
+
+/// Local connections in `before` that `after` no longer has.
+fn removed_local(before: &ConnectionsFile, after: &ConnectionsFile) -> Vec<String> {
+    before
+        .connections
+        .iter()
+        .filter(|c| c.kind == Kind::Local && !after.connections.iter().any(|a| a.id == c.id))
+        .map(|c| c.id.clone())
+        .collect()
 }
 
 #[cfg(test)]
@@ -200,6 +268,7 @@ mod tests {
 
     fn conn(env: &str, client: &str) -> Connection {
         Connection {
+            kind: Kind::Cluster,
             id: "c".into(),
             folder_id: "f".into(),
             name: String::new(),
@@ -210,7 +279,45 @@ mod tests {
             context: None,
             namespace: None,
             secret: DEFAULT_SECRET.into(),
+            host: String::new(),
+            user: String::new(),
+            database: String::new(),
         }
+    }
+
+    fn local() -> Connection {
+        Connection { kind: Kind::Local, local_port: 3306, host: "127.0.0.1".into(), user: "root".into(), database: "shop".into(), client: String::new(), ..conn("latest", "") }
+    }
+
+    #[test]
+    fn older_files_load_as_cluster_connections() {
+        let raw = r#"{"folders":[{"id":"f","name":"Acme"}],"connections":[{"id":"c","folder_id":"f","name":"","env":"review","client":"acme","local_port":3307}]}"#;
+        let file: ConnectionsFile = serde_json::from_str(raw).unwrap();
+        assert_eq!(file.connections[0].kind, Kind::Cluster);
+        assert!(validate(&file).is_ok());
+    }
+
+    #[test]
+    fn finds_deleted_local_connections() {
+        let folder = Folder { id: "f".into(), name: "Acme".into() };
+        let before = ConnectionsFile { folders: vec![folder.clone()], connections: vec![local(), conn("review", "acme")], relay_pod: String::new() };
+        let after = ConnectionsFile { connections: vec![], ..before.clone() };
+        assert_eq!(removed_local(&before, &after), vec!["c".to_string()]);
+        assert!(removed_local(&before, &before).is_empty());
+    }
+
+    #[test]
+    fn local_connections_validate_their_own_fields() {
+        let folder = Folder { id: "f".into(), name: "Acme".into() };
+        let file = |c: Connection| ConnectionsFile { folders: vec![folder.clone()], connections: vec![c], relay_pod: String::new() };
+        assert!(validate(&file(local())).is_ok());
+        assert!(validate(&file(Connection { host: " ".into(), ..local() })).is_err());
+        assert!(validate(&file(Connection { user: String::new(), ..local() })).is_err());
+        assert!(validate(&file(Connection { database: String::new(), ..local() })).is_err());
+        // Two local databases may share the standard port.
+        let mut two = file(local());
+        two.connections.push(Connection { id: "d".into(), ..local() });
+        assert!(validate(&two).is_ok());
     }
 
     #[test]

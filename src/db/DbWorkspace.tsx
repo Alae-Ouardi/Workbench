@@ -7,14 +7,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppSwitcher } from "../shell/AppSwitcher";
 import { useTabActive, useTabState, useTabTitle } from "../shell/TabContext";
 import { useConfirm } from "../shared/confirm/ConfirmProvider";
-import { EnvBadge } from "../shared/EnvBadge";
-import { envTier, isProdLike } from "../shared/envKind";
+import { envTier } from "../shared/envKind";
 import { IconSearch } from "../shared/icons";
+import { ConnBadge } from "./components/ConnBadge";
 import { ConnectionForm } from "./components/ConnectionForm";
 import { PromptDialog } from "./components/PromptDialog";
 import { useConnections } from "./hooks/useConnections";
 import { useSessions } from "./hooks/useSessions";
-import { displayName, draftConnection, groupByFolder, newId, resolveTarget } from "./logic/connections";
+import { displayName, draftConnection, filterGroups, isLocal, newId, nextFreePort, targetChips } from "./logic/connections";
 import type { Connection, Folder } from "./types";
 import { ConnectionHome } from "./views/ConnectionHome";
 import { ConnectionPage } from "./views/ConnectionPage";
@@ -29,7 +29,7 @@ type Dialog =
 export function DbWorkspace() {
   const { file, loaded, error, setError, save } = useConnections();
   const tabActive = useTabActive();
-  const { sessions, progress, ended, connect, disconnect } = useSessions(tabActive);
+  const { sessions, progress, ended, connect, cancel, disconnect } = useSessions(tabActive);
   const confirm = useConfirm();
   const [selectedId, setSelectedId] = useTabState<string | null>("db.connection", null);
   const [searching, setSearching] = useState(false);
@@ -38,42 +38,54 @@ export function DbWorkspace() {
   // connection always stays expanded).
   const [collapsed, setCollapsed] = useLocalState<string[]>("db.collapsedFolders", []);
   const collapsedSet = useMemo(() => new Set(collapsed), [collapsed]);
+  const [filter, setFilter] = useState("");
+  const filtering = filter.trim().length > 0;
+  const groups = useMemo(() => filterGroups(file, filter), [file, filter]);
   const toggleFolder = (id: string) => setCollapsed(collapsedSet.has(id) ? collapsed.filter((x) => x !== id) : [...collapsed, id]);
 
   const selected = file.connections.find((c) => c.id === selectedId) ?? null;
   const folderName = useMemo(() => new Map(file.folders.map((f) => [f.id, f.name])), [file.folders]);
-  useTabTitle(selected ? { label: displayName(selected), tier: envTier(selected.env) } : null);
+  useTabTitle(selected ? { label: displayName(selected), tier: envTier(isLocal(selected) ? "latest" : selected.env) } : null);
+
+  // Every connect is confirmed: a stray click in the list must never open a
+  // tunnel on its own. Production gets the red dialog with Cancel focused.
+  const confirmConnect = useCallback(
+    (c: Connection) => {
+      return confirm({
+        title: `Connect to ${displayName(c)}`,
+        target: targetChips(c),
+        envNames: isLocal(c) ? [] : [c.env],
+        detail: isLocal(c) ? undefined : (
+          <p className="text-[12px] text-slate-400">This starts a small relay pod in the namespace and removes it when you disconnect.</p>
+        ),
+        confirmLabel: "Connect",
+      });
+    },
+    [confirm],
+  );
 
   const startConnect = useCallback(
     async (c: Connection) => {
-      const tier = envTier(c.env);
-      if (isProdLike(tier)) {
-        const { context, namespace } = resolveTarget(c);
-        const ok = await confirm({
-          title: `Open a database tunnel to ${displayName(c)}`,
-          target: [
-            { label: "cluster", value: context },
-            { label: "namespace", value: namespace },
-            { label: "local port", value: String(c.local_port) },
-          ],
-          envNames: [c.env],
-          detail: <p className="text-[12px] text-slate-400">This starts a small relay pod in the namespace and removes it when you disconnect.</p>,
-          confirmLabel: "Connect",
-        });
-        if (!ok) return;
-      }
-      await connect(c.id);
+      if (await confirmConnect(c)) await connect(c.id);
     },
-    [confirm, connect],
+    [confirmConnect, connect],
   );
 
+  // Open connections (or ones already connecting) are shown at once; any
+  // other is selected only once the connect is confirmed.
   const open = useCallback(
-    (c: Connection) => {
+    async (c: Connection) => {
+      if (sessions[c.id] || progress[c.id]?.busy) {
+        setSelectedId(c.id);
+        setSearching(false);
+        return;
+      }
+      if (!(await confirmConnect(c))) return;
       setSelectedId(c.id);
       setSearching(false);
-      if (!sessions[c.id] && !progress[c.id]?.busy) void startConnect(c);
+      await connect(c.id);
     },
-    [sessions, progress, setSelectedId, startConnect],
+    [sessions, progress, setSelectedId, confirmConnect, connect],
   );
 
   useEffect(() => {
@@ -142,7 +154,7 @@ export function DbWorkspace() {
       file={file}
       loaded={loaded}
       sessions={sessions}
-      onOpen={open}
+      onOpen={(c) => void open(c)}
       onAdd={addConnection}
       onEdit={(c) => {
         setError(null);
@@ -150,7 +162,9 @@ export function DbWorkspace() {
       }}
       onDuplicate={(c) => {
         setError(null);
-        setDialog({ kind: "connection", connection: { ...draftConnection(file, { id: c.folder_id, name: "" }), ...c, id: newId(), name: "", local_port: draftConnection(file, { id: c.folder_id, name: "" }).local_port }, isNew: true });
+        // A copy gets its own tunnel port; a local database keeps its port.
+        const port = isLocal(c) ? c.local_port : nextFreePort(file);
+        setDialog({ kind: "connection", connection: { ...c, id: newId(), name: "", local_port: port }, isNew: true });
       }}
       onDelete={(c) => void removeConnection(c)}
       onNewFolder={() => setDialog({ kind: "folder", folder: null })}
@@ -166,12 +180,31 @@ export function DbWorkspace() {
         <div className="mb-4">
           <AppSwitcher title="Database" subtitle="Connections" />
         </div>
-        <button className="btn mb-3 text-xs" onClick={() => (selected ? setSearching(true) : setSelectedId(null))}>
-          <IconSearch size={13} /> Find a connection <kbd className="chip num ml-auto py-0">⌘K</kbd>
-        </button>
+        <div className="mb-3 flex items-center gap-1.5">
+          <label className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--line-soft)] px-2 py-1 focus-within:border-amber-300/50">
+            <IconSearch size={12} />
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              onKeyDown={(e) => e.key === "Escape" && setFilter("")}
+              placeholder="Filter connections"
+              aria-label="Filter connections"
+              className="min-w-0 flex-1 bg-transparent text-xs text-slate-200 outline-none placeholder:text-slate-600"
+            />
+            {filtering && (
+              <button className="text-[11px] text-slate-500 hover:text-slate-200" onClick={() => setFilter("")} title="Clear (esc)">
+                ×
+              </button>
+            )}
+          </label>
+          <button className="btn px-2 py-1 text-xs" onClick={() => (selected ? setSearching(true) : setSelectedId(null))} title="All connections (⌘K)">
+            ⌘K
+          </button>
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {groupByFolder(file).map((g) => {
-            const expanded = !collapsedSet.has(g.folder.id) || g.connections.some((c) => c.id === selectedId);
+          {filtering && groups.length === 0 && <p className="px-2 py-3 text-[11.5px] text-slate-500">No connection matches “{filter.trim()}”.</p>}
+          {groups.map((g) => {
+            const expanded = filtering || !collapsedSet.has(g.folder.id) || g.connections.some((c) => c.id === selectedId);
             return (
             <div key={g.folder.id} className="mb-1.5">
               <div className="group flex items-center rounded-lg px-1 py-0.5 hover:bg-[var(--line-soft)]">
@@ -193,12 +226,12 @@ export function DbWorkspace() {
               {expanded && g.connections.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => open(c)}
+                  onClick={() => void open(c)}
                   className={`flex w-full items-center gap-2 rounded-lg py-1.5 pr-2 pl-5 text-left text-[12.5px] ${
                     c.id === selectedId ? "bg-[var(--line)] text-slate-50 shadow-[inset_2px_0_0_#fbbf24]" : "text-slate-400 hover:bg-[var(--line-soft)] hover:text-slate-200"
                   }`}
                 >
-                  <EnvBadge tier={envTier(c.env)} />
+                  <ConnBadge connection={c} />
                   <span className="num min-w-0 flex-1 truncate">{displayName(c)}</span>
                   {sessions[c.id] && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" title="Connected" />}
                   {progress[c.id]?.busy && <span className="h-2.5 w-2.5 animate-spin rounded-full border border-amber-300 border-t-transparent" />}
@@ -242,6 +275,7 @@ export function DbWorkspace() {
               progress={progress[selected.id]}
               ended={ended[selected.id]}
               onConnect={() => void startConnect(selected)}
+              onCancel={() => cancel(selected.id)}
               onDisconnect={() => void disconnect(selected.id)}
               onEdit={() => setDialog({ kind: "connection", connection: selected, isNew: false })}
               onUsePort={(port) => {
