@@ -4417,6 +4417,7 @@ dependencies = [
  "block2",
  "chrono",
  "dirs 5.0.1",
+ "keyring",
  "mysql",
  "notify",
  "notify-debouncer-mini",

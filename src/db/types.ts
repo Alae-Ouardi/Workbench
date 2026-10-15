@@ -7,13 +7,22 @@ export interface Folder {
   name: string;
 }
 
+/** Cluster: through a relay pod. Local: reached directly (this Mac, Docker…). */
+export type ConnectionKind = "cluster" | "local";
+
 export interface Connection {
+  kind: ConnectionKind;
   id: string;
   folder_id: string;
   name: string;
   env: DbEnv;
   client: string;
+  /** Cluster: the tunnel's port on this Mac. Local: the database port. */
   local_port: number;
+  /** Local only. */
+  host: string;
+  user: string;
+  database: string;
   cluster_domain: string;
   context: string | null;
   namespace: string | null;
@@ -30,6 +39,8 @@ export interface SessionInfo {
   connection_id: string;
   context: string;
   namespace: string;
+  /** 127.0.0.1 for a tunnel, else the local database host. */
+  host: string;
   local_port: number;
   database: string;
   user: string;

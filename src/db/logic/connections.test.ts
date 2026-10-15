@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Connection, ConnectionsFile } from "../types";
-import { draftConnection, groupByFolder, nextFreePort, resolveTarget, scriptCommand, searchConnections, sharedClusterContext } from "./connections";
+import { displayName, draftConnection, filterGroups, targetChips, targetLine, groupByFolder, nextFreePort, resolveTarget, scriptCommand, searchConnections, sharedClusterContext } from "./connections";
 
 const conn = (id: string, folder: string, env: Connection["env"], client: string, port: number, extra: Partial<Connection> = {}): Connection => ({
+  kind: "cluster",
+  host: "",
+  user: "",
+  database: "",
   id,
   folder_id: folder,
   name: "",
@@ -70,5 +74,46 @@ describe("db connections", () => {
     expect(nextFreePort(file)).toBe(3310);
     const draft = draftConnection(file, { id: "n", name: "Initech EU" });
     expect(draft).toMatchObject({ client: "initech-eu", local_port: 3310, env: "review", folder_id: "n" });
+  });
+});
+
+describe("filterGroups", () => {
+  it("keeps every folder for an empty query", () => {
+    expect(filterGroups(file, "  ").map((g) => g.folder.name)).toEqual(["Acme", "Globex"]);
+  });
+
+  it("keeps only matching connections and drops empty folders", () => {
+    const groups = filterGroups(file, "review");
+    expect(groups.map((g) => g.folder.name)).toEqual(["Acme"]);
+    expect(groups[0].connections.map((c) => c.id)).toEqual(["2"]);
+  });
+
+  it("matches a folder name and keeps all its connections", () => {
+    expect(filterGroups(file, "acme").flatMap((g) => g.connections.map((c) => c.id))).toEqual(["2", "1"]);
+  });
+
+  it("returns nothing when no connection matches", () => {
+    expect(filterGroups(file, "nothing-here")).toEqual([]);
+  });
+});
+
+describe("local connections", () => {
+  const local = conn("9", "g", "latest", "", 3306, { kind: "local", host: "127.0.0.1", user: "root", database: "shop" });
+  const withLocal: ConnectionsFile = { ...file, connections: [...file.connections, local] };
+
+  it("are named and described by their database", () => {
+    expect(displayName(local)).toBe("shop");
+    expect(targetLine(local)).toBe("127.0.0.1:3306/shop");
+    expect(targetChips(local).map((t) => t.label)).toEqual(["host", "database", "user"]);
+  });
+
+  it("are found by 'local', host or database", () => {
+    expect(searchConnections(withLocal, "local").map((c) => c.id)).toEqual(["9"]);
+    expect(searchConnections(withLocal, "shop").map((c) => c.id)).toEqual(["9"]);
+  });
+
+  it("do not take tunnel ports", () => {
+    const busy: ConnectionsFile = { ...file, connections: [conn("9", "g", "latest", "", 3310, { kind: "local" })] };
+    expect(nextFreePort(busy)).toBe(3307);
   });
 });

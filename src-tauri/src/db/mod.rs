@@ -2,6 +2,7 @@
 //! MySQL sessions.
 
 pub mod connections;
+pub mod local;
 pub mod session;
 pub mod tunnel;
 pub mod changes;

@@ -3,11 +3,11 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { copyText } from "../../shared/clipboard";
-import { EnvBadge } from "../../shared/EnvBadge";
 import { envTier, isProdLike } from "../../shared/envKind";
+import { ConnBadge } from "../components/ConnBadge";
 import { STEPS, type Progress } from "../hooks/useSessions";
 import { db } from "../api";
-import { displayName, resolveTarget, scriptCommand } from "../logic/connections";
+import { displayName, isLocal, scriptCommand, targetLine } from "../logic/connections";
 import type { Connection, SessionInfo } from "../types";
 
 interface Props {
@@ -17,6 +17,8 @@ interface Props {
   progress: Progress | undefined;
   ended: string | undefined;
   onConnect: () => void;
+  /** Stop a connect in progress. */
+  onCancel: () => void;
   onDisconnect: () => void;
   onEdit: () => void;
   /** Switch to a free local port and retry (offered when the port is busy). */
@@ -29,9 +31,10 @@ function minutesLeft(iso: string): number {
   return Math.max(0, Math.round((Date.parse(iso) - Date.now()) / 60000));
 }
 
-export function ConnectionPage({ connection: c, folderName, session, progress, ended, onConnect, onDisconnect, onEdit, onUsePort, children }: Props) {
+export function ConnectionPage({ connection: c, folderName, session, progress, ended, onConnect, onCancel, onDisconnect, onEdit, onUsePort, children }: Props) {
+  const local = isLocal(c);
   const tier = envTier(c.env);
-  const { context, namespace } = resolveTarget(c);
+  const steps = local ? STEPS.filter((s) => s.name === "database") : STEPS;
   const [, tick] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -48,24 +51,26 @@ export function ConnectionPage({ connection: c, folderName, session, progress, e
   }
 
   const header = (
-    <header className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] px-5 py-3" style={isProdLike(tier) ? { boxShadow: "inset 0 2px 0 #fb7185" } : undefined}>
-      <EnvBadge tier={tier} size="md" />
+    <header className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] px-5 py-3" style={!local && isProdLike(tier) ? { boxShadow: "inset 0 2px 0 #fb7185" } : undefined}>
+      <ConnBadge connection={c} size="md" />
       <div className="min-w-0">
         <div className="flex items-baseline gap-2">
           <h1 className="num truncate text-[15px] font-semibold text-slate-50">{displayName(c)}</h1>
           <span className="truncate text-[11.5px] text-slate-500">{folderName}</span>
         </div>
         <div className="num truncate text-[11px] text-slate-500">
-          {session ? `${session.user}@localhost:${session.local_port}/${session.database} · MySQL ${session.server_version}` : `${namespace} · ${context}`}
+          {session ? `${session.user}@${session.host}:${session.local_port}/${session.database} · MySQL ${session.server_version}` : targetLine(c)}
         </div>
       </div>
       <div className="ml-auto flex items-center gap-2">
         {session ? (
           <>
-            <span className="num text-[11px] text-slate-500" title="The relay pod stops after an hour">
-              {minutesLeft(session.expires_at)} min left
-            </span>
-            <button className="btn py-1 text-xs" onClick={() => void copy("details", `localhost:${session.local_port} · ${session.user} · ${session.database}`)}>
+            {session.expires_at && (
+              <span className="num text-[11px] text-slate-500" title="The relay pod stops after an hour">
+                {minutesLeft(session.expires_at)} min left
+              </span>
+            )}
+            <button className="btn py-1 text-xs" onClick={() => void copy("details", `${session.host}:${session.local_port} · ${session.user} · ${session.database}`)}>
               {copied === "details" ? "Copied ✓" : "Copy details"}
             </button>
             <button className="btn py-1 text-xs" onClick={() => void copy("password", db.password(c.id))} title="For an external SQL client">
@@ -94,7 +99,7 @@ export function ConnectionPage({ connection: c, folderName, session, progress, e
   }
 
   const busy = progress?.busy ?? false;
-  const freePort = Number(/Port (\d+) is free/.exec(progress?.error ?? "")?.[1] ?? 0);
+  const freePort = local ? 0 : Number(/Port (\d+) is free/.exec(progress?.error ?? "")?.[1] ?? 0);
   return (
     <div className="flex h-full min-h-0 flex-col">
       {header}
@@ -102,7 +107,7 @@ export function ConnectionPage({ connection: c, folderName, session, progress, e
         {ended && <p className="mb-4 rounded-xl bg-amber-500/10 px-4 py-2.5 text-[12px] text-amber-200">{ended}</p>}
         <div className="glass rounded-2xl p-5">
           <ol className="space-y-3">
-            {STEPS.map((s) => {
+            {steps.map((s) => {
               const st = progress?.steps[s.name];
               const state = st?.state ?? "pending";
               return (
@@ -138,13 +143,26 @@ export function ConnectionPage({ connection: c, folderName, session, progress, e
               Use port {freePort} for this connection and retry
             </button>
           )}
-          <button className="btn btn-primary mt-3 w-full justify-center py-2" disabled={busy} onClick={onConnect}>
-            {busy ? "Connecting…" : progress?.error ? "Retry" : "Connect"}
-          </button>
+          {busy ? (
+            <div className="mt-3 flex gap-2">
+              <button className="btn btn-primary flex-1 justify-center py-2" disabled>
+                Connecting…
+              </button>
+              <button className="btn justify-center px-4 py-2 text-rose-300" onClick={onCancel}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button className="btn btn-primary mt-3 w-full justify-center py-2" onClick={onConnect}>
+              {progress?.error ? "Retry" : "Connect"}
+            </button>
+          )}
         </div>
-        <p className="num mt-3 truncate text-center text-[10.5px] text-slate-600" title={scriptCommand(c)}>
-          same as $ {scriptCommand(c)}
-        </p>
+        {!local && (
+          <p className="num mt-3 truncate text-center text-[10.5px] text-slate-600" title={scriptCommand(c)}>
+            same as $ {scriptCommand(c)}
+          </p>
+        )}
       </div>
     </div>
   );

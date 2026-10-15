@@ -16,10 +16,16 @@ export function useCalendarAccess() {
     window.addEventListener("focus", check);
     return () => window.removeEventListener("focus", check);
   }, []);
+  // "asking": the macOS prompt is up. "no-prompt": macOS answered without
+  // showing one, so access can only be granted in System Settings.
+  const [prompt, setPrompt] = useState<"idle" | "asking" | "no-prompt">("idle");
   const request = useCallback(async () => {
-    setAccess(await calendarApi.requestAccess().catch(() => "denied" as const));
+    setPrompt("asking");
+    const result = await calendarApi.requestAccess().catch(() => "denied" as const);
+    setAccess(result);
+    setPrompt(result === "not_determined" ? "no-prompt" : "idle");
   }, []);
-  return { access, request };
+  return { access, prompt, request };
 }
 
 export function useCalendarEvents(from: Date, to: Date, enabled: boolean) {

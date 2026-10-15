@@ -45,8 +45,11 @@ export function useSessions(active = true) {
           if (step.step === "database" && step.state === "done") setTimeout(refresh, 300);
           return;
         }
+        if (step.detail === "cancelled") return;
         setProgress((p) => {
-          const current = p[step.connection_id] ?? { steps: {}, error: null, busy: true };
+          // A late event for an attempt already over (cancelled) changes nothing.
+          const current = p[step.connection_id];
+          if (!current) return p;
           return { ...p, [step.connection_id]: { ...current, steps: { ...current.steps, [step.step]: step } } };
         });
       }),
@@ -69,7 +72,10 @@ export function useSessions(active = true) {
       setProgress((p) => ({ ...p, [id]: { ...p[id], busy: false } }));
       return info;
     } catch (e) {
-      setProgress((p) => ({ ...p, [id]: { ...(p[id] ?? { steps: {} }), error: errorText(e), busy: false } }));
+      const text = errorText(e);
+      // A cancelled attempt leaves no error behind, just the Connect button.
+      if (text === "cancelled") setProgress(({ [id]: _p, ...rest }) => rest);
+      else setProgress((p) => ({ ...p, [id]: { ...(p[id] ?? { steps: {} }), error: text, busy: false } }));
       return null;
     } finally {
       mine.current.delete(id);
@@ -82,5 +88,7 @@ export function useSessions(active = true) {
     setProgress(({ [id]: _p, ...rest }) => rest);
   }, []);
 
-  return { sessions, progress, ended, connect, disconnect };
+  const cancel = useCallback((id: string) => void db.cancelConnect(id), []);
+
+  return { sessions, progress, ended, connect, cancel, disconnect };
 }
