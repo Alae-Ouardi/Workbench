@@ -60,7 +60,7 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
     >
       <form
         onSubmit={handleSubmit}
-        className="w-[480px] rounded-xl border border-[#2a3040] bg-[#11151f] p-5 shadow-2xl"
+        className="w-[480px] rounded-xl border border-[var(--line)] bg-[var(--panel-2)] p-5 shadow-2xl"
       >
         <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-slate-300">
           New {kind}
@@ -77,7 +77,7 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
                   ? k === "bug"
                     ? "bg-red-900/70 text-red-200"
                     : "bg-sky-900/70 text-sky-200"
-                  : "bg-[#1c2230] text-slate-500 hover:text-slate-300"
+                  : "bg-[var(--line-soft)] text-slate-500 hover:text-slate-300"
               }`}
             >
               {k}
@@ -90,7 +90,7 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
           autoFocus
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="mb-3 w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-3 py-2 text-sm outline-none focus:border-sky-600"
+          className="mb-3 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-sky-600"
           placeholder={kind === "bug" ? "What is broken?" : "What needs to be done?"}
         />
 
@@ -99,7 +99,7 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
-          className="mb-3 w-full resize-none rounded-md border border-[#2a3040] bg-[#0b0e14] px-3 py-2 text-sm outline-none focus:border-sky-600"
+          className="mb-3 w-full resize-none rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-sky-600"
           placeholder="Context, acceptance criteria, repro steps…"
         />
 
@@ -109,7 +109,7 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
             <select
               value={projectId ?? ""}
               onChange={(e) => setProjectId(Number(e.target.value))}
-              className="w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-2 py-2 text-sm outline-none focus:border-sky-600"
+              className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-2 py-2 text-sm outline-none focus:border-sky-600"
             >
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -123,7 +123,7 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value as Priority)}
-              className="w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-2 py-2 text-sm outline-none focus:border-sky-600"
+              className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-2 py-2 text-sm outline-none focus:border-sky-600"
             >
               <option value="low">Low</option>
               <option value="normal">Normal</option>
@@ -137,7 +137,7 @@ export function NewTaskModal({ projects, defaultProjectId, onSubmit, onClose }: 
         <input
           value={assignee}
           onChange={(e) => setAssignee(e.target.value)}
-          className="mb-4 w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-3 py-2 text-sm outline-none focus:border-sky-600"
+          className="mb-4 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-sky-600"
           placeholder="me, claude-code, codex, opencode…"
         />
 

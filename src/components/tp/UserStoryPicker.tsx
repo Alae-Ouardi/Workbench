@@ -81,18 +81,18 @@ export function UserStoryPicker({ value, onChange, disabledReason }: UserStoryPi
         disabled={!!disabledReason}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={disabledReason ?? "Search by name, or paste an id / entity URL…"}
-        className="w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-2.5 py-1.5 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-sky-600 disabled:opacity-60"
+        className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1.5 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-sky-600 disabled:opacity-60"
       />
       {searching && <p className="mt-1 text-[10px] text-slate-600">Searching…</p>}
       {error && !searching && <p className="mt-1 text-[10px] text-amber-500">{error}</p>}
       {results.length > 0 && (
-        <ul className="mt-1 max-h-40 overflow-y-auto rounded-md border border-[#2a3040] bg-[#0b0e14]">
+        <ul className="mt-1 max-h-40 overflow-y-auto rounded-md border border-[var(--line)] bg-[var(--bg)]">
           {results.map((story) => (
             <li key={story.id}>
               <button
                 type="button"
                 onClick={() => onChange(story)}
-                className="block w-full px-2.5 py-1.5 text-left hover:bg-[#161b28]"
+                className="block w-full px-2.5 py-1.5 text-left hover:bg-[var(--panel-2)]"
               >
                 <span className="block truncate text-xs text-slate-200">
                   <span className="font-mono text-sky-500">#{story.id}</span> {story.name}

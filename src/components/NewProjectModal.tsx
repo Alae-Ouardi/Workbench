@@ -61,7 +61,7 @@ export function NewProjectModal({ onCreated, onClose }: NewProjectModalProps) {
     >
       <form
         onSubmit={handleSubmit}
-        className="w-[480px] rounded-xl border border-[#2a3040] bg-[#11151f] p-5 shadow-2xl"
+        className="w-[480px] rounded-xl border border-[var(--line)] bg-[var(--panel-2)] p-5 shadow-2xl"
       >
         <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-slate-300">
           New project
@@ -73,12 +73,12 @@ export function NewProjectModal({ onCreated, onClose }: NewProjectModalProps) {
             readOnly
             value={path}
             placeholder="No folder selected"
-            className="flex-1 rounded-md border border-[#2a3040] bg-[#0b0e14] px-3 py-2 text-sm text-slate-400 outline-none"
+            className="flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-slate-400 outline-none"
           />
           <button
             type="button"
             onClick={pickFolder}
-            className="shrink-0 rounded-md border border-[#2a3040] bg-[#1c2230] px-3 py-2 text-xs text-slate-300 hover:bg-[#252e42]"
+            className="shrink-0 rounded-md border border-[var(--line)] bg-[var(--line-soft)] px-3 py-2 text-xs text-slate-300 hover:bg-[var(--line)]"
           >
             Choose…
           </button>
@@ -89,7 +89,7 @@ export function NewProjectModal({ onCreated, onClose }: NewProjectModalProps) {
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mb-3 w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-3 py-2 text-sm outline-none focus:border-sky-600"
+          className="mb-3 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-sky-600"
           placeholder="My project"
         />
 
@@ -101,7 +101,7 @@ export function NewProjectModal({ onCreated, onClose }: NewProjectModalProps) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
-          className="mb-4 w-full resize-none rounded-md border border-[#2a3040] bg-[#0b0e14] px-3 py-2 text-sm outline-none focus:border-sky-600"
+          className="mb-4 w-full resize-none rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-sky-600"
           placeholder="Describe what you want to build so AI tools can plan from it…"
         />
 

@@ -15,11 +15,18 @@
 //! * [`sync`] drains that queue — from the app's background worker, or from
 //!   `taskboard tp sync` when the app is not running.
 
+pub mod cache;
 pub mod client;
 pub mod config;
+pub mod prefs;
 pub mod queue;
+pub mod read;
+pub mod redact;
 pub mod sync;
 
 pub use client::{TpEntityState, TpUser, TpUserStory};
 pub use config::TpSettings;
 pub use queue::{SyncQueueItem, SyncReport};
+pub use read::{TpPerson, TpProject, TpSprint, TpStateRef, TpTimeEntry, TpWorkItem};
+pub use cache::{CacheEntry, TpCache};
+pub use prefs::WorkspacePrefs;

@@ -76,19 +76,11 @@ export function TrayPopover() {
   const pendingCount = relevantQueue.length - failedCount;
 
   return (
-    <div className="flex h-screen flex-col bg-[#0d1018] text-slate-300">
+    <div className="flex min-h-0 flex-1 flex-col bg-[var(--panel)] text-slate-300">
       {/* --- header --- */}
-      <div className="shrink-0 border-b border-white/[0.06] bg-gradient-to-b from-[#13171f] to-[#0d1018] px-4 pb-3 pt-3.5">
+      <div className="shrink-0 border-b border-white/[0.06] bg-gradient-to-b from-[var(--panel-2)] to-[var(--panel)] px-4 pb-3 pt-3.5">
         <div className="mb-2.5 flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-500/10">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-sky-400">
-                <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="9" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="1" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
-              </svg>
-            </div>
             <span className="shrink-0 text-[13px] font-semibold tracking-tight text-slate-100">
               TaskBoard
             </span>

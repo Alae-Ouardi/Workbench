@@ -49,7 +49,7 @@ export function SyncQueuePanel() {
   }
 
   return (
-    <section className="space-y-3 rounded-lg border border-[#1c2230] bg-[#0d1018] p-4">
+    <section className="space-y-3 rounded-lg border border-[var(--line-soft)] bg-[var(--panel)] p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
           Sync queue
@@ -67,7 +67,7 @@ export function SyncQueuePanel() {
             <button
               disabled={busy}
               onClick={() => act(tpRetryAllQueueItems)}
-              className="rounded border border-[#2a3040] px-2 py-1 text-[11px] text-slate-400 hover:text-slate-200 disabled:opacity-40"
+              className="rounded border border-[var(--line)] px-2 py-1 text-[11px] text-slate-400 hover:text-slate-200 disabled:opacity-40"
             >
               Retry all
             </button>
@@ -98,7 +98,7 @@ export function SyncQueuePanel() {
           Nothing queued — everything is in sync.
         </p>
       ) : (
-        <ul className="divide-y divide-[#1c2230]">
+        <ul className="divide-y divide-[var(--line-soft)]">
           {items.map((item) => (
             <li key={item.id} className="flex items-start justify-between gap-3 py-2">
               <div className="min-w-0">

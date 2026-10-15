@@ -7,13 +7,13 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use taskboard_core::{Db, Kind, NewTask, Priority, Project, Status, TaskFilter, TaskUpdate};
 
-/// TaskBoard: a task dashboard shared between you and your AI coding tools.
+/// Workbench: the task board shared between you and your AI coding tools.
 ///
-/// All data lives in a local SQLite database (~/.taskboard/taskboard.db,
+/// All data lives in a local SQLite database (~/.workbench/taskboard.db,
 /// override with $TASKBOARD_DB) shared with the TaskBoard desktop app and
 /// the MCP server.
 #[derive(Parser)]
-#[command(name = "taskboard", version, about)]
+#[command(name = "workbench", version, about)]
 struct Cli {
     #[command(subcommand)]
     command: Command,

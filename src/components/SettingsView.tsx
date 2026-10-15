@@ -74,7 +74,7 @@ export function SettingsView() {
       )}
 
       {/* --- connection --- */}
-      <section className="space-y-3 rounded-lg border border-[#1c2230] bg-[#0d1018] p-4">
+      <section className="space-y-3 rounded-lg border border-[var(--line-soft)] bg-[var(--panel)] p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
           Connection
         </h2>
@@ -161,7 +161,7 @@ export function SettingsView() {
       </section>
 
       {/* --- sync behaviour --- */}
-      <section className="space-y-3 rounded-lg border border-[#1c2230] bg-[#0d1018] p-4">
+      <section className="space-y-3 rounded-lg border border-[var(--line-soft)] bg-[var(--panel)] p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
           Sync
         </h2>
@@ -236,11 +236,11 @@ function stripDerived(view: TpSettingsView): TpSettings {
 }
 
 const inputClass =
-  "w-full rounded-md border border-[#2a3040] bg-[#0b0e14] px-2.5 py-1.5 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-sky-600";
+  "w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1.5 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-sky-600";
 const primaryButton =
   "rounded-md bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-40 disabled:hover:bg-sky-700";
 const ghostButton =
-  "rounded-md border border-[#2a3040] px-3 py-1.5 text-xs text-slate-400 hover:text-red-400 disabled:opacity-40";
+  "rounded-md border border-[var(--line)] px-3 py-1.5 text-xs text-slate-400 hover:text-red-400 disabled:opacity-40";
 
 interface FieldProps {
   label: string;

@@ -1,13 +1,23 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import App from "./App";
-import { TrayPopover } from "./components/TrayPopover";
+import Root from "./Root";
+import { TrayHub } from "./components/tray/TrayHub";
+import { MeetingProvider } from "./meetings/MeetingProvider";
+import { PrefsProvider } from "./tp-workspace/prefs";
 
 const isTray = getCurrentWindow().label === "tray";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    {isTray ? <TrayPopover /> : <App />}
+    {isTray ? (
+      <PrefsProvider>
+        <MeetingProvider showPopup={false}>
+          <TrayHub />
+        </MeetingProvider>
+      </PrefsProvider>
+    ) : (
+      <Root />
+    )}
   </React.StrictMode>,
 );

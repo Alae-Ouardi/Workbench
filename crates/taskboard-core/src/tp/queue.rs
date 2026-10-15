@@ -446,7 +446,9 @@ pub fn backoff_secs(attempts: i64) -> i64 {
 }
 
 fn clip_error(error: &str) -> String {
-    let trimmed = error.trim();
+    // Never store the access token, whatever produced the error.
+    let redacted = crate::tp::redact::redact_token(error);
+    let trimmed = redacted.trim();
     if trimmed.chars().count() <= 300 {
         return trimmed.to_string();
     }

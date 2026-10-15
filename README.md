@@ -34,6 +34,23 @@ TaskBoard bridges the gap between **you** and your **AI coding assistants**. It'
 - **TargetProcess sync** — link a project to a user story and its tasks are mirrored there ([details](#targetprocess-integration))
 - **Live sync** — all windows and tools react to changes instantly
 
+### TP Workspace (new in 2.0)
+
+The home screen now opens either **TaskBoard** (everything above) or the **TP Workspace**, a read-mostly view of your TargetProcess sprint work:
+
+- **Dashboard** — the sprint as a board by workflow state, progress / delivered / days-left / attention KPIs, and a burndown (rebuilt from item finish dates, since TargetProcess keeps no remaining-effort history)
+- **Sprint stories** — every story in the sprint with progress and spent / remaining hours, expandable to its tasks and bugs
+- **My work** — everything assigned to you across sprints, grouped by state, with one-click `+0.5h / +1h / +2h` time logging
+- **Overdue** — unfinished items past their planned end or left in an ended sprint (last 180 days), most late first
+- **Time** — month / week calendar of your logged hours; click a day for the breakdown. Working days under your daily target are flagged and listed so the timesheet is easy to fill
+- **Standup** — Yesterday / Today / Blockers generated from your logged time and assigned work, ready to copy
+- **Item drawer** — open any item to move it to another state, log time against it, or jump to it in TargetProcess
+- **Filters and search** — project (ILS, Evo…), sprint, "mine" and text filters that persist; `⌘K` searches items and commands
+
+Shortcuts: `⌘0` home · `⌘1` TaskBoard · `⌘2` TP Workspace · `⌘K` search · `⌘R` refresh · `⌃⌘1–6` workspace views · `⌘,` settings.
+
+Data is fetched live and cached in `~/.taskboard/tp-cache.db`, so views open instantly and refresh in the background. Workspace preferences (default projects, colours, daily target, working days, refresh interval, theme) live in `~/.taskboard/workspace.json`. The TargetProcess URL and token are the same ones the sync uses.
+
 ### CLI
 
 - Create projects, tasks, and bugs
@@ -77,14 +94,15 @@ cp -R target/release/bundle/macos/TaskBoard.app /Applications/
 
 ### Connect Your AI Agent
 
-Add TaskBoard as an MCP server in your AI tool's config:
+Add Workbench as an MCP server in your AI tool's config (or run `scripts/setup.sh`). The
+command is `workbench`; `taskboard` still works as an alias.
 
 **Claude Code** (`~/.claude/mcp_servers.json`):
 ```json
 {
   "mcpServers": {
-    "taskboard": {
-      "command": "taskboard",
+    "workbench": {
+      "command": "workbench",
       "args": ["mcp"]
     }
   }
@@ -95,15 +113,15 @@ Add TaskBoard as an MCP server in your AI tool's config:
 ```json
 {
   "mcp": {
-    "taskboard": {
+    "workbench": {
       "type": "local",
-      "command": ["taskboard", "mcp"]
+      "command": ["workbench", "mcp"]
     }
   }
 }
 ```
 
-That's it — your AI agent can now plan tasks, track progress, and hand off work on TaskBoard.
+That's it — your AI agent can now plan tasks, track progress, and hand off work on Workbench.
 
 ## How to Use
 

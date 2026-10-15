@@ -48,6 +48,9 @@ pub fn tp_get_settings() -> Result<TpSettingsView, String> {
 #[tauri::command]
 pub fn tp_save_settings(settings: TpSettings) -> Result<TpSettingsView, String> {
     let mut current = TpSettings::load();
+    if current.normalized_base_url() != settings.normalized_base_url() {
+        crate::workspace::clear_cache();
+    }
     current.apply_update(settings);
     current.save().map_err(|e| e.to_string())?;
     Ok(view(current))
@@ -58,6 +61,7 @@ pub fn tp_save_settings(settings: TpSettings) -> Result<TpSettingsView, String> 
 #[tauri::command]
 pub fn tp_set_token(token: String) -> Result<TpSettingsView, String> {
     taskboard_core::tp::config::save_token(&token).map_err(|e| e.to_string())?;
+    crate::workspace::clear_cache();
     let mut settings = TpSettings::load();
     settings.clear_cached_user();
     settings.save().map_err(|e| e.to_string())?;
@@ -67,6 +71,7 @@ pub fn tp_set_token(token: String) -> Result<TpSettingsView, String> {
 #[tauri::command]
 pub fn tp_clear_token() -> Result<TpSettingsView, String> {
     taskboard_core::tp::config::clear_token().map_err(|e| e.to_string())?;
+    crate::workspace::clear_cache();
     let mut settings = TpSettings::load();
     settings.clear_cached_user();
     settings.save().map_err(|e| e.to_string())?;

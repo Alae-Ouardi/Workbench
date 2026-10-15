@@ -38,7 +38,7 @@ export function TrayProjectMenu({
   }
 
   return (
-    <div className="shrink-0 border-b border-white/[0.06] bg-[#0a0d13] px-3 py-3">
+    <div className="shrink-0 border-b border-white/[0.06] bg-[var(--bg)] px-3 py-3">
       <div className="mb-2.5 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[12px] font-semibold text-slate-200">{project.name}</p>

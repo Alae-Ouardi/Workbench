@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Workbench shows your scheduled meetings, reminds you before they start and names tracked calls after them.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Workbench shows your scheduled meetings, reminds you before they start and names tracked calls after them.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Browser panes: local dev servers (http://localhost:…) and http sites. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

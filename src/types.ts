@@ -124,7 +124,7 @@ export interface NewTaskInput {
 
 // ---------------------------------------------------------------- TargetProcess
 
-/** Non-secret TargetProcess settings, as stored in ~/.taskboard/config.json. */
+/** Non-secret TargetProcess settings, as stored in ~/.workbench/config.json. */
 export interface TpSettings {
   base_url: string;
   enabled: boolean;

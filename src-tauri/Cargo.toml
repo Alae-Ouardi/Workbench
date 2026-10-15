@@ -1,6 +1,6 @@
 [package]
 name = "taskboard-app"
-version = "0.3.0"
+version = "2.0.0"
 description = "TaskBoard: a task dashboard shared between you and your AI coding tools"
 authors = ["alae"]
 edition = "2021"
@@ -18,14 +18,25 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "image-png", "unstable"] }
 tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
+chrono = { workspace = true }
 taskboard-core = { workspace = true }
 notify = "6"
 notify-debouncer-mini = "0.4"
 portable-pty = "0.8"
+base64 = "0.22"
+dirs = { workspace = true }
+mysql = { version = "28", default-features = false, features = ["minimal-rust", "derive", "buffer-pool", "native-tls"] }
 
+# Direct access to the menu-bar item (see tray.rs: keeping its click area aligned).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation", "NSButton", "NSColor", "NSColorSpace", "NSControl", "NSEvent", "NSResponder", "NSStatusBarButton", "NSStatusItem", "NSView"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSGeometry", "NSDate", "NSString", "NSURL", "NSError", "NSPredicate"] }
+objc2-event-kit = { version = "0.3", default-features = false, features = ["std", "block2", "objc2-app-kit", "EKCalendar", "EKCalendarItem", "EKEvent", "EKEventStore", "EKParticipant", "EKObject", "EKTypes", "EKStructuredLocation"] }
+block2 = "0.6"

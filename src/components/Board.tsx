@@ -65,7 +65,7 @@ function Column({ status, tasks, showProject, onOpen }: ColumnProps) {
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-w-44 flex-col rounded-xl border border-[#1c2230] border-t-2 bg-[#0f131e] ${
+      className={`flex min-w-44 flex-col rounded-xl border border-[var(--line-soft)] border-t-2 bg-[var(--panel-2)] ${
         COLUMN_ACCENTS[status]
       } ${isOver ? "ring-1 ring-sky-500/60" : ""}`}
     >
@@ -73,7 +73,7 @@ function Column({ status, tasks, showProject, onOpen }: ColumnProps) {
         <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
           {STATUS_LABELS[status]}
         </span>
-        <span className="rounded-full bg-[#1c2230] px-2 py-0.5 text-xs text-slate-400">
+        <span className="rounded-full bg-[var(--line-soft)] px-2 py-0.5 text-xs text-slate-400">
           {tasks.length}
         </span>
       </div>

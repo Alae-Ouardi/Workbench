@@ -84,7 +84,7 @@ function Row({ dot, label, value, onChange, required, disabledHint }: RowProps) 
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
           placeholder={required ? "required" : "leave blank to skip"}
-          className="flex-1 rounded-md border border-[#2a3040] bg-[#0b0e14] px-2.5 py-1 text-xs text-slate-200 outline-none placeholder:text-slate-700 focus:border-sky-600"
+          className="flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1 text-xs text-slate-200 outline-none placeholder:text-slate-700 focus:border-sky-600"
         />
       )}
     </div>

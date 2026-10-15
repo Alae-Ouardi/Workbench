@@ -124,7 +124,7 @@ impl Db {
     }
 
     /// Open the user-global database: `$TASKBOARD_DB` if set, otherwise
-    /// `~/.taskboard/taskboard.db`.
+    /// `~/.workbench/taskboard.db` (see [`crate::paths`]).
     pub fn open_default() -> Result<Self> {
         Self::open(&Self::default_path())
     }
@@ -135,10 +135,7 @@ impl Db {
                 return PathBuf::from(p);
             }
         }
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".taskboard")
-            .join("taskboard.db")
+        crate::paths::data_dir().join("taskboard.db")
     }
 
     /// Column names of `table`, as reported by SQLite. Used by the migration

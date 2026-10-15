@@ -113,7 +113,7 @@ export default function App() {
     selectedProjectId !== null ? tasks.filter((t) => t.project_id === selectedProjectId) : tasks;
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       <Sidebar
         projects={projects}
         selectedId={selectedProjectId}
@@ -126,7 +126,7 @@ export default function App() {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* top bar */}
-        <div className="flex shrink-0 items-center justify-between border-b border-[#1c2230] px-4 py-2">
+        <div className="glass flex shrink-0 items-center justify-between border-x-0 border-t-0 px-4 py-2.5">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-slate-300">
               {selectedProject?.name ?? "All projects"}
@@ -139,7 +139,7 @@ export default function App() {
             <PanelToggle active={panel} onChange={setPanel} />
             <button
               onClick={() => setShowNewTask(true)}
-              className="rounded-md bg-sky-700 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-600"
+              className="btn btn-primary"
             >
               + New task
             </button>
@@ -228,14 +228,14 @@ const PANEL_LABELS: Record<Panel, string> = {
 
 function PanelToggle({ active, onChange }: { active: Panel; onChange: (p: Panel) => void }) {
   return (
-    <div className="flex rounded-md border border-[#2a3040] p-0.5">
+    <div className="flex rounded-md border border-[var(--line)] p-0.5">
       {(["board", "terminal", "settings"] as Panel[]).map((p) => (
         <button
           key={p}
           onClick={() => onChange(p)}
           title={p === "settings" ? "Settings — TargetProcess integration" : undefined}
           className={`rounded px-3 py-0.5 text-xs transition-colors ${
-            active === p ? "bg-[#1c2230] text-slate-200" : "text-slate-600 hover:text-slate-400"
+            active === p ? "bg-[var(--line-soft)] text-slate-200" : "text-slate-600 hover:text-slate-400"
           }`}
         >
           {PANEL_LABELS[p]}

@@ -12,6 +12,7 @@
 //! * a write is only successful if the response body carries an `Id`, since
 //!   TargetProcess can answer 200 with a non-entity payload.
 
+use crate::tp::redact::redact_token;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -64,6 +65,8 @@ pub struct TpClient {
     base_url: String,
     token: String,
     agent: ureq::Agent,
+    /// Instance timezone, used to read dates that come back without an offset.
+    pub(crate) tz_offset_minutes: i32,
 }
 
 impl TpClient {
@@ -77,17 +80,18 @@ impl TpClient {
         }
         let token = crate::tp::config::load_token().unwrap_or_default();
         if token.is_empty() {
-            return Err(Error::TpNotConfigured(
-                "no access token stored — add one in Settings".to_string(),
-            ));
+            return Err(Error::TpNotConfigured(crate::tp::config::token_problem()));
         }
-        Ok(Self::new(settings.normalized_base_url(), &token))
+        let mut client = Self::new(settings.normalized_base_url(), &token);
+        client.tz_offset_minutes = settings.tz_offset_minutes;
+        Ok(client)
     }
 
     pub fn new(base_url: &str, token: &str) -> Self {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             token: token.to_string(),
+            tz_offset_minutes: 0,
             agent: ureq::AgentBuilder::new()
                 // Without an explicit timeout a stalled DNS or TLS handshake
                 // hangs the caller forever; in TimeAgent that froze the app.
@@ -111,13 +115,13 @@ impl TpClient {
         format!("{}/{}/{}?{}", self.base_url, API_PREFIX, path, qs)
     }
 
-    fn get_json(&self, path: &str, query: &[(&str, String)]) -> Result<serde_json::Value> {
+    pub(crate) fn get_json(&self, path: &str, query: &[(&str, String)]) -> Result<serde_json::Value> {
         self.send(self.agent.get(&self.url(path, query)), None)
     }
 
     /// TargetProcess uses POST both to create and to update; the entity's own
     /// URL (`Tasks/123`) is the update endpoint.
-    fn post_json(&self, path: &str, body: serde_json::Value) -> Result<serde_json::Value> {
+    pub(crate) fn post_json(&self, path: &str, body: serde_json::Value) -> Result<serde_json::Value> {
         self.send(self.agent.post(&self.url(path, &[])), Some(body))
     }
 
@@ -135,26 +139,27 @@ impl TpClient {
             Ok(response) => {
                 let text = response
                     .into_string()
-                    .map_err(|e| Error::Tp(format!("could not read response: {e}")))?;
+                    .map_err(|e| Error::Tp(redact_token(&format!("could not read response: {e}"))))?;
                 if text.trim().is_empty() {
                     return Ok(serde_json::Value::Object(Default::default()));
                 }
                 serde_json::from_str(&text)
-                    .map_err(|e| Error::Tp(format!("invalid JSON response: {e}: {}", clip(&text))))
+                    .map_err(|e| Error::Tp(redact_token(&format!("invalid JSON response: {e}: {}", clip(&text)))))
             }
             // Keep the status code first in the message: `Error::is_retryable`
             // parses it to decide whether replaying could ever help.
             Err(ureq::Error::Status(code, response)) => {
                 let text = response.into_string().unwrap_or_default();
-                Err(Error::Tp(format!("HTTP {code}: {}", clip(&text))))
+                Err(Error::Tp(redact_token(&format!("HTTP {code}: {}", clip(&text)))))
             }
-            Err(e) => Err(Error::Tp(e.to_string())),
+            // Transport errors quote the full URL, token included.
+            Err(e) => Err(Error::Tp(redact_token(&e.to_string()))),
         }
     }
 
     /// Page through a collection. A single request would silently stop at
     /// `MAX_TAKE` items.
-    fn get_all_items(
+    pub(crate) fn get_all_items(
         &self,
         path: &str,
         query: &[(&str, String)],
@@ -496,7 +501,7 @@ pub fn today_in_offset(
 
 /// A TargetProcess write only succeeded if the response carries an `Id`; the
 /// status code alone is not enough.
-fn require_id(response: &serde_json::Value, context: &str) -> Result<i64> {
+pub(crate) fn require_id(response: &serde_json::Value, context: &str) -> Result<i64> {
     response
         .get("Id")
         .and_then(|v| v.as_i64())
@@ -550,7 +555,7 @@ fn clip(text: &str) -> String {
     trimmed.chars().take(200).collect::<String>() + "…"
 }
 
-fn str_field(value: &serde_json::Value, key: &str) -> String {
+pub(crate) fn str_field(value: &serde_json::Value, key: &str) -> String {
     value
         .get(key)
         .and_then(|v| v.as_str())

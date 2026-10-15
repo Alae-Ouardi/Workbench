@@ -1,5 +1,6 @@
 import { useState } from "react";
 import packageJson from "../../package.json";
+import { AppSwitcher } from "../shell/AppSwitcher";
 import type { ProjectSummary } from "../types";
 import { ProjectLinkPanel } from "./tp/ProjectLinkPanel";
 
@@ -47,10 +48,9 @@ export function Sidebar({
   }
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-[#1c2230] bg-[#0d1018]">
-      <div className="flex items-center gap-2 px-4 py-4">
-        <span className="text-lg">🗂️</span>
-        <span className="text-sm font-bold tracking-wide text-slate-200">TaskBoard</span>
+    <aside className="flex w-60 shrink-0 flex-col glass border-y-0 border-l-0">
+      <div className="px-2 py-3">
+        <AppSwitcher title="TaskBoard" subtitle="v2 · flow" />
       </div>
       <nav className="flex-1 overflow-y-auto px-2">
         <SidebarItem
@@ -75,7 +75,7 @@ export function Sidebar({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search projects…"
-          className="mb-2 mx-2 w-auto rounded-md border border-[#2a3040] bg-[#0b0e14] px-2 py-1 text-xs text-slate-300 outline-none placeholder:text-slate-700 focus:border-sky-600"
+          className="mb-2 mx-2 w-auto rounded-md border border-[var(--line)] bg-[var(--bg)] px-2 py-1 text-xs text-slate-300 outline-none placeholder:text-slate-700 focus:border-sky-600"
         />
         {filtered.map((p) => (
           <SidebarItem
@@ -119,7 +119,7 @@ export function Sidebar({
           onCancel={() => setConfirmId(null)}
         />
       )}
-      <div className="shrink-0 border-t border-[#1c2230] px-4 py-2">
+      <div className="shrink-0 border-t border-[var(--line-soft)] px-4 py-2">
         <p className="text-[10px] text-slate-700">v{packageJson.version}</p>
       </div>
     </aside>
@@ -151,7 +151,7 @@ function ProjectMenu({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm space-y-4 rounded-lg border border-[#2a3040] bg-[#0d1018] p-4 shadow-xl"
+        className="w-full max-w-sm space-y-4 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div>
@@ -170,7 +170,7 @@ function ProjectMenu({
           />
         </div>
 
-        <div className="flex items-center justify-between border-t border-[#1c2230] pt-3">
+        <div className="flex items-center justify-between border-t border-[var(--line-soft)] pt-3">
           <button
             onClick={onDelete}
             className="rounded border border-red-900/60 px-2.5 py-1 text-[11px] text-red-400 hover:bg-red-950/40"
@@ -201,7 +201,7 @@ function ConfirmDialog({ project, onConfirm, onCancel }: ConfirmDialogProps) {
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-sm rounded-lg border border-[#2a3040] bg-[#0d1018] p-4 shadow-xl">
+      <div className="w-full max-w-sm rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4 shadow-xl">
         <p className="mb-1 text-sm font-semibold text-slate-200">Delete project?</p>
         <p className="mb-3 text-xs leading-relaxed text-slate-400">
           <span className="font-medium text-slate-300">"{project.name}"</span> and{" "}
@@ -225,7 +225,7 @@ function ConfirmDialog({ project, onConfirm, onCancel }: ConfirmDialogProps) {
           </button>
           <button
             onClick={onCancel}
-            className="flex-1 rounded border border-[#2a3040] px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
+            className="flex-1 rounded border border-[var(--line)] px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
           >
             Cancel
           </button>
@@ -262,7 +262,7 @@ function SidebarItem({
         onClick={onClick}
         title={title}
         className={`flex flex-1 items-center justify-between rounded-md px-2 py-1.5 pr-7 text-left text-sm transition-colors ${
-          selected ? "bg-[#1b2232] text-slate-100" : "text-slate-400 hover:bg-[#141927]"
+          selected ? "bg-[var(--line-soft)] text-slate-100" : "text-slate-400 hover:bg-[var(--panel-2)]"
         }`}
       >
         <span className="flex min-w-0 flex-1 flex-col truncate">
@@ -291,7 +291,7 @@ function SidebarItem({
             onOpenMenu();
           }}
           title="Project settings — TargetProcess link, delete"
-          className="absolute right-1 flex h-5 w-5 items-center justify-center rounded text-slate-600 transition-colors hover:bg-[#1b2232] hover:text-slate-200"
+          className="absolute right-1 flex h-5 w-5 items-center justify-center rounded text-slate-600 transition-colors hover:bg-[var(--line-soft)] hover:text-slate-200"
         >
           ⋯
         </button>
