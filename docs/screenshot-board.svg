@@ -44,24 +44,24 @@
   <rect x="8" y="156" width="224" height="48" rx="6" fill="#1b2232"/>
   <circle cx="22" cy="170" r="3" fill="#a78bfa"/>
   <text x="32" y="174" fill="#e2e8f0" font-size="12" font-weight="500">Notifications feature</text>
-  <text x="32" y="190" fill="#475569" font-size="9" font-family="ui-monospace, monospace">/Users/pro/Desktop/taskboard</text>
+  <text x="32" y="190" fill="#475569" font-size="9" font-family="ui-monospace, monospace">~/code/taskboard</text>
   <rect x="200" y="163" width="18" height="13" rx="3" fill="#1c2230"/>
   <text x="209" y="173" fill="#64748b" font-size="9" text-anchor="middle">3</text>
 
   <!-- Project 2 -->
   <rect x="8" y="210" width="224" height="48" rx="6" fill="transparent"/>
   <text x="32" y="228" fill="#94a3b8" font-size="12">DB Refactor</text>
-  <text x="32" y="244" fill="#334155" font-size="9" font-family="ui-monospace, monospace">/Users/pro/Desktop/taskboard</text>
+  <text x="32" y="244" fill="#334155" font-size="9" font-family="ui-monospace, monospace">~/code/taskboard</text>
   <rect x="204" y="220" width="16" height="13" rx="3" fill="transparent"/>
   <text x="212" y="230" fill="#475569" font-size="9" text-anchor="middle">2</text>
 
   <!-- Project 3 -->
   <text x="32" y="282" fill="#94a3b8" font-size="12">Auth System</text>
-  <text x="32" y="298" fill="#334155" font-size="9" font-family="ui-monospace, monospace">/Users/pro/auth-service</text>
+  <text x="32" y="298" fill="#334155" font-size="9" font-family="ui-monospace, monospace">~/code/auth-service</text>
 
   <!-- Project 4 -->
   <text x="32" y="336" fill="#94a3b8" font-size="12">API Docs</text>
-  <text x="32" y="352" fill="#334155" font-size="9" font-family="ui-monospace, monospace">/Users/pro/api-docs</text>
+  <text x="32" y="352" fill="#334155" font-size="9" font-family="ui-monospace, monospace">~/code/api-docs</text>
 
   <!-- Version -->
   <rect x="0" y="724" width="240" height="26" fill="#0d1018"/>
@@ -72,7 +72,7 @@
   <rect x="240" y="0" width="960" height="48" fill="#0d1018"/>
   <line x1="240" y1="48" x2="1200" y2="48" stroke="#1c2230" stroke-width="1"/>
   <text x="260" y="29" fill="#cbd5e1" font-size="13" font-weight="600">Notifications feature</text>
-  <text x="430" y="30" fill="#475569" font-size="10" font-family="ui-monospace, monospace">/Users/pro/Desktop/taskboard</text>
+  <text x="430" y="30" fill="#475569" font-size="10" font-family="ui-monospace, monospace">~/code/taskboard</text>
 
   <!-- Board / Terminal toggle -->
   <rect x="980" y="12" width="80" height="24" rx="5" fill="#0b0e14" stroke="#2a3040" stroke-width="1"/>
