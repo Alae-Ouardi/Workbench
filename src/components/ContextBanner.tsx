@@ -82,7 +82,7 @@ export function ContextBanner({ projectId, refreshKey, onResume }: ContextBanner
       // it then squeezed the sibling board to zero height and the tasks
       // disappeared entirely. Capping at 80% of the panel and scrolling the
       // overflow keeps at least a fifth of the height for the board.
-      className="relative shrink-0 max-h-[80%] overflow-y-auto border-b border-[#1c2230] bg-[#0d1018] px-4 py-2.5 text-xs"
+      className="relative shrink-0 max-h-[80%] overflow-y-auto border-b border-[var(--line-soft)] bg-[var(--panel)] px-4 py-2.5 text-xs"
       style={bannerStyle}
     >
       <div className="flex items-center gap-2">
@@ -133,14 +133,14 @@ export function ContextBanner({ projectId, refreshKey, onResume }: ContextBanner
                   value={draftRequest}
                   onChange={(e) => setDraftRequest(e.target.value)}
                   rows={2}
-                  className="resize-none rounded border border-[#2a3040] bg-[#0b0e14] px-2 py-1 text-xs text-slate-200 outline-none focus:border-sky-600"
+                  className="resize-none rounded border border-[var(--line)] bg-[var(--bg)] px-2 py-1 text-xs text-slate-200 outline-none focus:border-sky-600"
                 />
                 <label className="text-[10px] text-slate-600">Approved plan</label>
                 <textarea
                   value={draftPlan}
                   onChange={(e) => setDraftPlan(e.target.value)}
                   rows={3}
-                  className="resize-none rounded border border-[#2a3040] bg-[#0b0e14] px-2 py-1 text-xs text-slate-200 outline-none focus:border-sky-600"
+                  className="resize-none rounded border border-[var(--line)] bg-[var(--bg)] px-2 py-1 text-xs text-slate-200 outline-none focus:border-sky-600"
                 />
                 <div className="flex gap-1">
                   <button onClick={saveEdit} className="rounded bg-sky-700 px-2 py-0.5 text-[11px] text-white">
@@ -179,7 +179,7 @@ export function ContextBanner({ projectId, refreshKey, onResume }: ContextBanner
                       Session ID
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <code className="rounded bg-[#11151f] px-1.5 py-0.5 text-[11px] text-slate-300">
+                      <code className="rounded bg-[var(--panel-2)] px-1.5 py-0.5 text-[11px] text-slate-300">
                         {p.last_session_id}
                       </code>
                       <button
@@ -233,7 +233,7 @@ export function ContextBanner({ projectId, refreshKey, onResume }: ContextBanner
                 <span className="text-slate-600">session:</span>
                 {p.last_session_id ? (
                   <>
-                    <code className="rounded bg-[#11151f] px-1.5 py-0.5 text-[11px] text-slate-300">
+                    <code className="rounded bg-[var(--panel-2)] px-1.5 py-0.5 text-[11px] text-slate-300">
                       {p.last_session_id}
                     </code>
                     <button

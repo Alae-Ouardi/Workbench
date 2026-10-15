@@ -86,7 +86,7 @@ export function ProjectLinkPanel({
               })
             }
             title="Queue any tasks that have not reached TargetProcess yet"
-            className="rounded border border-[#2a3040] px-2 py-1 text-[10px] text-slate-400 hover:text-sky-400 disabled:opacity-40"
+            className="rounded border border-[var(--line)] px-2 py-1 text-[10px] text-slate-400 hover:text-sky-400 disabled:opacity-40"
           >
             Push existing tasks
           </button>
@@ -94,7 +94,7 @@ export function ProjectLinkPanel({
             disabled={busy}
             onClick={() => act(() => tpUnlinkProject(project.id))}
             title="Stop syncing. TargetProcess entities are left alone."
-            className="rounded border border-[#2a3040] px-2 py-1 text-[10px] text-slate-400 hover:text-red-400 disabled:opacity-40"
+            className="rounded border border-[var(--line)] px-2 py-1 text-[10px] text-slate-400 hover:text-red-400 disabled:opacity-40"
           >
             Unlink
           </button>
@@ -157,7 +157,7 @@ export function ProjectLinkPanel({
                 setPicked(null);
               })
             }
-            className="w-full rounded border border-[#2a3040] px-2 py-1.5 text-[11px] text-slate-300 hover:border-sky-700 hover:text-sky-400 disabled:opacity-40"
+            className="w-full rounded border border-[var(--line)] px-2 py-1.5 text-[11px] text-slate-300 hover:border-sky-700 hover:text-sky-400 disabled:opacity-40"
           >
             {busy ? "Linking…" : "Link, but ignore existing tasks"}
           </button>

@@ -88,16 +88,16 @@ export function TaskDrawer({ taskId, onClose, onRefresh }: TaskDrawerProps) {
 
   if (!detail) {
     return (
-      <aside className="flex w-96 shrink-0 items-center justify-center border-l border-[#1c2230] bg-[#0d1018]">
+      <aside className="flex w-96 shrink-0 items-center justify-center border-l border-[var(--line-soft)] bg-[var(--panel)]">
         <span className="text-sm text-slate-600">Loading…</span>
       </aside>
     );
   }
 
   return (
-    <aside className="flex w-96 shrink-0 flex-col border-l border-[#1c2230] bg-[#0d1018]">
+    <aside className="flex w-96 shrink-0 flex-col border-l border-[var(--line-soft)] bg-[var(--panel)]">
       {/* header */}
-      <div className="flex items-center justify-between border-b border-[#1c2230] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-[var(--line-soft)] px-4 py-3">
         <span className="text-xs text-slate-500">#{detail.id}</span>
         <div className="flex gap-2">
           <button
@@ -128,7 +128,7 @@ export function TaskDrawer({ taskId, onClose, onRefresh }: TaskDrawerProps) {
                   if (e.key === "Enter") handleTitleSave();
                   if (e.key === "Escape") setEditTitle(null);
                 }}
-                className="rounded border border-[#2a3040] bg-[#0b0e14] px-2 py-1 text-sm text-slate-100 outline-none focus:border-sky-600"
+                className="rounded border border-[var(--line)] bg-[var(--bg)] px-2 py-1 text-sm text-slate-100 outline-none focus:border-sky-600"
               />
               <div className="flex gap-1">
                 <button
@@ -163,7 +163,7 @@ export function TaskDrawer({ taskId, onClose, onRefresh }: TaskDrawerProps) {
             <StatusBadge status={detail.status} onChange={handleStatusChange} />
             <PriorityBadge priority={detail.priority} onChange={handlePriorityChange} />
             {detail.assignee && (
-              <span className="rounded bg-[#1c2230] px-2 py-0.5 text-[10px] text-slate-400">
+              <span className="rounded bg-[var(--line-soft)] px-2 py-0.5 text-[10px] text-slate-400">
                 {detail.assignee}
               </span>
             )}
@@ -204,7 +204,7 @@ export function TaskDrawer({ taskId, onClose, onRefresh }: TaskDrawerProps) {
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
                 rows={4}
-                className="w-full resize-none rounded border border-[#2a3040] bg-[#0b0e14] px-2 py-1 text-xs text-slate-300 outline-none focus:border-sky-600"
+                className="w-full resize-none rounded border border-[var(--line)] bg-[var(--bg)] px-2 py-1 text-xs text-slate-300 outline-none focus:border-sky-600"
               />
               <div className="flex gap-1">
                 <button
@@ -235,7 +235,7 @@ export function TaskDrawer({ taskId, onClose, onRefresh }: TaskDrawerProps) {
 
         {/* dependencies */}
         {(detail.depends_on.length > 0 || detail.blocks.length > 0) && (
-          <div className="border-t border-[#1c2230] px-4 py-3">
+          <div className="border-t border-[var(--line-soft)] px-4 py-3">
             {detail.depends_on.length > 0 && (
               <>
                 <div className="mb-1 text-xs text-slate-600">Depends on</div>
@@ -260,10 +260,10 @@ export function TaskDrawer({ taskId, onClose, onRefresh }: TaskDrawerProps) {
         )}
 
         {/* comments / handoff notes */}
-        <div className="border-t border-[#1c2230] px-4 py-3">
+        <div className="border-t border-[var(--line-soft)] px-4 py-3">
           <div className="mb-2 text-xs text-slate-600">Comments / Handoff notes</div>
           {detail.comments.map((c) => (
-            <div key={c.id} className="mb-3 rounded-md bg-[#111827] p-2.5">
+            <div key={c.id} className="mb-3 rounded-md bg-[var(--panel-2)] p-2.5">
               <div className="mb-1 flex items-center gap-1.5">
                 <span className="text-[10px] font-semibold text-slate-400">{c.author}</span>
                 <span className="text-[10px] text-slate-700">{c.created_at.slice(0, 16)}</span>
@@ -278,19 +278,19 @@ export function TaskDrawer({ taskId, onClose, onRefresh }: TaskDrawerProps) {
             onChange={(e) => setComment(e.target.value)}
             rows={2}
             placeholder="Add a comment or handoff note…"
-            className="mb-2 w-full resize-none rounded border border-[#2a3040] bg-[#0b0e14] px-2 py-1 text-xs text-slate-300 outline-none focus:border-sky-600"
+            className="mb-2 w-full resize-none rounded border border-[var(--line)] bg-[var(--bg)] px-2 py-1 text-xs text-slate-300 outline-none focus:border-sky-600"
           />
           <button
             onClick={handleAddComment}
             disabled={saving || !comment.trim()}
-            className="rounded bg-[#1c2230] px-3 py-1 text-xs text-slate-300 hover:bg-[#2a3040] disabled:opacity-40"
+            className="rounded bg-[var(--line-soft)] px-3 py-1 text-xs text-slate-300 hover:bg-[var(--line)] disabled:opacity-40"
           >
             Add comment
           </button>
         </div>
 
         {/* activity */}
-        <div className="border-t border-[#1c2230] px-4 py-3">
+        <div className="border-t border-[var(--line-soft)] px-4 py-3">
           <div className="mb-2 text-xs text-slate-600">Activity</div>
           {detail.events.map((e) => (
             <div key={e.id} className="mb-1 text-[10px] text-slate-600">

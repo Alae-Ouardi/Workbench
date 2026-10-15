@@ -11,7 +11,7 @@ use anyhow::Result;
 use serde_json::{json, Value};
 use taskboard_core::{Db, NewTask, Priority, Status, TaskFilter, TaskUpdate};
 
-const SERVER_NAME: &str = "taskboard";
+const SERVER_NAME: &str = "workbench";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_PROTOCOL_VERSION: &str = "2025-06-18";
 
@@ -71,7 +71,7 @@ fn handle(method: &str, params: &Value) -> Result<Value, (i64, String)> {
                 "protocolVersion": requested,
                 "capabilities": {"tools": {}},
                 "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
-                "instructions": "TaskBoard is a shared kanban board for humans and AI coding agents. \
+                "instructions": "Workbench's task board is a shared kanban board for humans and AI coding agents. \
                     When you plan work, create the planned steps with create_tasks. Move a task to \
                     in_progress before working on it, review when it needs human review, and done when \
                     finished. If you must stop before finishing (e.g. usage limit), add a handoff \
@@ -235,7 +235,7 @@ fn tool_definitions() -> Value {
         },
         {
             "name": "link_project_user_story",
-            "description": "Link a TaskBoard project to a TargetProcess user story. From then on, tasks created in this project are mirrored as TargetProcess entities under that story, finishing a task moves the entity to the workflow's Done state, and the task's estimate_points is logged there as time spent. Requires the TargetProcess URL and access token to be configured in the app's Settings.",
+            "description": "Link a TaskBoard project to a TargetProcess user story. From then on, tasks created in this project are mirrored as TargetProcess entities under that story, finishing a task moves the entity to the workflow's Done state, and the task's estimate_points is logged there as time spent. Requires the TargetProcess URL and access token to be configured in the Workbench app's Settings.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -379,8 +379,8 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
             Ok(json!({
                 "project": project,
                 "queued_operations": queued,
-                "note": "Queued operations are pushed by the TaskBoard app within ~15s, \
-                         or immediately with `taskboard tp sync`.",
+                "note": "Queued operations are pushed by the Workbench app within ~15s, \
+                         or immediately with `workbench tp sync`.",
             }))
         }
         "unlink_project_user_story" => {
@@ -392,8 +392,8 @@ fn call_tool(name: &str, args: &Value) -> anyhow::Result<Value> {
             let queued = db.repush_tp_project(project_id)?;
             Ok(json!({
                 "queued_operations": queued,
-                "note": "Queued updates are pushed by the TaskBoard app within ~15s, \
-                         or immediately with `taskboard tp sync`.",
+                "note": "Queued updates are pushed by the Workbench app within ~15s, \
+                         or immediately with `workbench tp sync`.",
             }))
         }
         "tp_sync_status" => {

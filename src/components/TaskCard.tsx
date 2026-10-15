@@ -40,7 +40,7 @@ export function TaskCard({ task, showProject, onOpen }: TaskCardProps) {
       {...listeners}
       {...attributes}
       onClick={() => onOpen(task.id)}
-      className={`group cursor-pointer rounded-lg border border-[#222837] bg-[#141927] p-3 shadow-sm transition-colors hover:border-[#3b4357] ${
+      className={`group cursor-pointer rounded-lg border border-[var(--line)] bg-[var(--panel-2)] p-3 shadow-sm transition-colors hover:border-[var(--line-strong)] ${
         isDragging ? "opacity-80 shadow-xl" : ""
       }`}
     >

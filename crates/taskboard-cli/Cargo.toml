@@ -1,8 +1,13 @@
 [package]
 name = "taskboard-cli"
-version = "0.3.0"
+version = "2.0.0"
 edition = "2021"
 
+[[bin]]
+name = "workbench"
+path = "src/workbench.rs"
+
+# The original name, kept so existing scripts and agent configs still work.
 [[bin]]
 name = "taskboard"
 path = "src/main.rs"

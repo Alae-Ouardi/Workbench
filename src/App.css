@@ -1,20 +1,156 @@
 @import "tailwindcss";
 @import "@xterm/xterm/css/xterm.css";
 
-:root {
+/* ---------------------------------------------------------------- tokens
+   Every surface reads these variables, so a theme is just a different set of
+   values. The existing components were written against Tailwind's `slate` and
+   `sky` scales, which are remapped onto the tokens below (`@theme inline`
+   keeps the `var()` reference so the scale follows the active theme). */
+
+:root,
+:root[data-theme="dark"] {
   color-scheme: dark;
+  --bg: #04060c;
+  --bg-elev: #070b16;
+  --panel: rgb(10 15 28 / 0.72);
+  --panel-2: rgb(16 23 41 / 0.78);
+  --panel-solid: #0a0f1c;
+  --line-soft: rgb(120 160 255 / 0.09);
+  --line: rgb(120 160 255 / 0.16);
+  --line-strong: rgb(120 160 255 / 0.28);
+  --glow: rgb(34 211 238 / 0.35);
+  --glow-violet: rgb(167 139 250 / 0.35);
+  --aurora-1: rgb(34 211 238 / 0.14);
+  --aurora-2: rgb(167 139 250 / 0.12);
+  --aurora-3: rgb(16 185 129 / 0.07);
+  --grid-line: rgb(120 160 255 / 0.035);
+
+  --ink-50: #f8faff;
+  --ink-100: #eef2ff;
+  --ink-200: #dbe3f4;
+  --ink-300: #b9c4dc;
+  --ink-400: #8f9bb8;
+  --ink-500: #6c7896;
+  --ink-600: #4f5a76;
+  --ink-700: #3a4560;
+  --ink-800: #232c42;
+  --ink-900: #141a2b;
+  --ink-950: #0a0e19;
+
+  --acc-200: #a5f3fc;
+  --acc-300: #67e8f9;
+  --acc-400: #22d3ee;
+  --acc-500: #06b6d4;
+  --acc-600: #0891b2;
+  --acc-700: #0e7490;
+  --acc-800: #155e75;
+  --acc-900: #164e63;
+  --acc-950: #083344;
 }
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef2f9;
+  --bg-elev: #f6f8fc;
+  --panel: rgb(255 255 255 / 0.74);
+  --panel-2: rgb(246 248 253 / 0.86);
+  --panel-solid: #ffffff;
+  --line-soft: rgb(30 50 110 / 0.07);
+  --line: rgb(30 50 110 / 0.13);
+  --line-strong: rgb(30 50 110 / 0.24);
+  --glow: rgb(8 145 178 / 0.25);
+  --glow-violet: rgb(124 58 237 / 0.22);
+  --aurora-1: rgb(34 211 238 / 0.16);
+  --aurora-2: rgb(167 139 250 / 0.14);
+  --aurora-3: rgb(16 185 129 / 0.08);
+  --grid-line: rgb(30 50 110 / 0.04);
+
+  /* Inverted: "light" ink is dark text on a light canvas. */
+  --ink-50: #05070d;
+  --ink-100: #0b1020;
+  --ink-200: #141b30;
+  --ink-300: #1f2942;
+  --ink-400: #36425f;
+  --ink-500: #56617c;
+  --ink-600: #6f7a94;
+  --ink-700: #9aa4ba;
+  --ink-800: #c9d0de;
+  --ink-900: #e3e8f1;
+  --ink-950: #f0f3f9;
+
+  --acc-200: #0e7490;
+  --acc-300: #0e7490;
+  --acc-400: #0891b2;
+  --acc-500: #0891b2;
+  --acc-600: #0891b2;
+  --acc-700: #0e7490;
+  --acc-800: #a5f3fc;
+  --acc-900: #cffafe;
+  --acc-950: #ecfeff;
+}
+
+@theme inline {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --color-slate-50: var(--ink-50);
+  --color-slate-100: var(--ink-100);
+  --color-slate-200: var(--ink-200);
+  --color-slate-300: var(--ink-300);
+  --color-slate-400: var(--ink-400);
+  --color-slate-500: var(--ink-500);
+  --color-slate-600: var(--ink-600);
+  --color-slate-700: var(--ink-700);
+  --color-slate-800: var(--ink-800);
+  --color-slate-900: var(--ink-900);
+  --color-slate-950: var(--ink-950);
+
+  --color-sky-200: var(--acc-200);
+  --color-sky-300: var(--acc-300);
+  --color-sky-400: var(--acc-400);
+  --color-sky-500: var(--acc-500);
+  --color-sky-600: var(--acc-600);
+  --color-sky-700: var(--acc-700);
+  --color-sky-800: var(--acc-800);
+  --color-sky-900: var(--acc-900);
+  --color-sky-950: var(--acc-950);
+
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-neon: var(--acc-400);
+}
+
+/* ----------------------------------------------------------------- base */
 
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
-  background: #0b0e14;
-  color: #d6dbe5;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink-200);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+}
+
+body {
+  background-color: var(--bg);
+  /* Aurora + faint grid: depth without competing with the content. */
+  background-image:
+    radial-gradient(60rem 40rem at 10% -10%, var(--aurora-1), transparent 60%),
+    radial-gradient(50rem 36rem at 110% 10%, var(--aurora-2), transparent 60%),
+    radial-gradient(40rem 30rem at 50% 120%, var(--aurora-3), transparent 60%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: auto, auto, auto, 32px 32px, 32px 32px;
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--glow);
 }
 
 *::-webkit-scrollbar {
@@ -23,15 +159,205 @@ body,
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #2a3040;
+  background: var(--line);
   border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--line-strong);
 }
 
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 
+:focus-visible {
+  outline: 2px solid var(--acc-400);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Inputs that sit inside their own glowing frame (search bars, palettes). */
+.bare-input:focus-visible {
+  outline: none;
+}
+
 .xterm {
   height: 100%;
   padding: 8px;
+  /* Night Owl background, also behind the padding. */
+  background: #011627;
+}
+
+/* xterm paints its scroll area black by default; match the theme instead. */
+.xterm .xterm-viewport {
+  background-color: #011627 !important;
+}
+
+/* ------------------------------------------------------------ components */
+
+@layer components {
+  .glass {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  .glass-strong {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+  }
+
+  .neon-ring {
+    box-shadow:
+      0 0 0 1px var(--line-strong),
+      0 0 24px -6px var(--glow);
+  }
+
+  .neon-text {
+    background: linear-gradient(90deg, var(--acc-300), #a78bfa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    color: var(--ink-300);
+    background: var(--panel-2);
+    transition: all 150ms ease;
+  }
+  .btn:hover:not(:disabled) {
+    color: var(--ink-100);
+    border-color: var(--line-strong);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    color: #021014;
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--acc-300), var(--acc-500));
+    box-shadow: 0 0 20px -6px var(--glow);
+  }
+  .btn-primary:hover:not(:disabled) {
+    color: #021014;
+    box-shadow: 0 0 28px -4px var(--glow);
+  }
+
+  .input {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    padding: 0.4rem 0.65rem;
+    font-size: 0.8125rem;
+    color: var(--ink-100);
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .input:focus {
+    border-color: var(--acc-500);
+    box-shadow: 0 0 0 3px var(--glow);
+  }
+  .input::placeholder {
+    color: var(--ink-600);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    color: var(--ink-300);
+    background: var(--panel-2);
+    white-space: nowrap;
+  }
+
+  .label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-500);
+  }
+}
+
+/* --------------------------------------------------------------- motion */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--glow);
+  }
+  50% {
+    box-shadow: 0 0 16px 2px var(--glow);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+.animate-rise {
+  animation: rise 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2.4s ease-in-out infinite;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--panel-2) 25%, var(--line) 50%, var(--panel-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

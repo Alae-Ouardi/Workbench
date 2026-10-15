@@ -4,6 +4,7 @@
 
 mod db;
 mod error;
+pub mod paths;
 mod projects;
 mod tasks;
 pub mod tp;

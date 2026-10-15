@@ -34,7 +34,7 @@ export function EstimateInput({
           const next = Number.parseFloat(e.target.value);
           onChange(Number.isFinite(next) && next > 0 ? next : 0);
         }}
-        className={`rounded border border-[#2a3040] bg-[#0b0e14] text-right text-slate-300 outline-none focus:border-sky-600 disabled:opacity-50 ${
+        className={`rounded border border-[var(--line)] bg-[var(--bg)] text-right text-slate-300 outline-none focus:border-sky-600 disabled:opacity-50 ${
           compact ? "w-14 px-1 py-0.5 text-[11px]" : "w-20 px-2 py-1 text-xs"
         }`}
       />
@@ -65,7 +65,7 @@ export function EstimateBadge({ points, logged = 0 }: EstimateBadgeProps) {
       className={`inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-px text-[10px] ${
         isLogged
           ? "bg-emerald-950/50 text-emerald-500"
-          : "bg-[#161b28] text-slate-500"
+          : "bg-[var(--panel-2)] text-slate-500"
       }`}
     >
       {isLogged && <span aria-hidden>✓</span>}

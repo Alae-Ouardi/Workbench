@@ -199,7 +199,7 @@ fn mcp_server_initialize_and_create() {
     assert_eq!(lines.len(), 4, "one response per request: {out}");
 
     let init: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
-    assert_eq!(init["result"]["serverInfo"]["name"], "taskboard");
+    assert_eq!(init["result"]["serverInfo"]["name"], "workbench");
 
     let tools: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
     let names: Vec<&str> = tools["result"]["tools"]

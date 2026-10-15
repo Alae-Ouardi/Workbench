@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Workbench app icon. Source for every raster in this folder:
+       regenerate with `pnpm tauri icon src-tauri/icons/icon-1024.png`.
+       Geometry matches the in-app mark in src/shell/Logo.tsx (64-unit grid),
+       placed on the macOS 824px icon tile: a bench whose braced legs form a
+       W, with the workspaces' tools on top (a block, a database, a clock). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1630"/>
+      <stop offset="100%" stop-color="#04060c"/>
+    </linearGradient>
+    <linearGradient id="fg" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.75" cy="0.2" r="0.7">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="halo2" cx="0.2" cy="0.95" r="0.6">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <g transform="translate(100 100) scale(13.7333) translate(-2 -2)">
+    <rect x="2" y="2" width="60" height="60" rx="13.5" fill="url(#bg)" filter="url(#shadow)"/>
+    <rect x="2" y="2" width="60" height="60" rx="13.5" fill="url(#halo)"/>
+    <rect x="2" y="2" width="60" height="60" rx="13.5" fill="url(#halo2)"/>
+    <rect x="2.4" y="2.4" width="59.2" height="59.2" rx="13.1" fill="none" stroke="url(#fg)" stroke-opacity="0.6" stroke-width="0.8"/>
+    <g filter="url(#glow)">
+      <!-- tools on the bench -->
+      <rect x="14" y="21.5" width="9" height="9" rx="2" fill="url(#fg)"/>
+      <path d="M27.5 18.5c0-1.7 2.2-2.8 4.5-2.8s4.5 1.1 4.5 2.8v10.2c0 1.7-2.2 2.8-4.5 2.8s-4.5-1.1-4.5-2.8z" fill="url(#fg)"/>
+      <ellipse cx="32" cy="18.5" rx="4.5" ry="2" fill="#0b1224" fill-opacity="0.55"/>
+      <circle cx="45" cy="25" r="5.6" fill="none" stroke="url(#fg)" stroke-width="2.2"/>
+      <path d="M45 22v3.4l2.2 1.4" fill="none" stroke="#e0fbff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- bench top -->
+      <rect x="10" y="32" width="44" height="5" rx="2.5" fill="url(#fg)"/>
+      <!-- braced legs forming a W -->
+      <path d="M15 38.5 21.5 50 32 41 42.5 50 49 38.5" fill="none" stroke="url(#fg)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <circle cx="51.5" cy="13" r="2" fill="#e0fbff"/>
+  </g>
+</svg>

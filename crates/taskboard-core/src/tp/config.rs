@@ -1,7 +1,7 @@
 //! TargetProcess connection settings.
 //!
 //! Split in two on purpose: everything non-secret lives in a JSON file next to
-//! the database (`~/.taskboard/config.json`) so it is easy to inspect and back
+//! the database (`~/.workbench/config.json`) so it is easy to inspect and back
 //! up, while the access token goes to the OS secret store. Both the app and the
 //! short-lived MCP/CLI process read through here, so there is one source of
 //! truth for how to reach TargetProcess.
@@ -58,7 +58,7 @@ impl Default for TpSettings {
 }
 
 impl TpSettings {
-    /// `~/.taskboard/config.json`, or `$TASKBOARD_CONFIG` when set. Derived from
+    /// `~/.workbench/config.json`, or `$TASKBOARD_CONFIG` when set. Derived from
     /// the database location so the config always sits beside the data.
     pub fn default_path() -> PathBuf {
         if let Ok(p) = std::env::var("TASKBOARD_CONFIG") {
@@ -154,6 +154,21 @@ impl TpSettings {
             crate::types::Status::Open | crate::types::Status::Waiting => "",
         };
         (!name.is_empty()).then_some(name)
+    }
+}
+
+/// Why no token could be read: none saved, or the Keychain refused access
+/// (macOS asks again for each new build of a program).
+pub fn token_problem() -> String {
+    match keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT).map(|e| e.get_password()) {
+        Ok(Err(keyring::Error::NoEntry)) | Ok(Ok(_)) => {
+            "no access token stored — add one in Workbench › Settings".to_string()
+        }
+        Ok(Err(e)) | Err(e) => format!(
+            "macOS Keychain did not let this program read the TargetProcess token ({e}). \
+             The token is still saved: allow access when macOS asks (Always Allow), \
+             or restart the agent session so it uses the current build."
+        ),
     }
 }
 

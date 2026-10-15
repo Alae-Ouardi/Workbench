@@ -1,8 +1,7 @@
-import { FitAddon } from "@xterm/addon-fit";
-import { Terminal as XTerm } from "@xterm/xterm";
 import { useEffect, useRef, useState } from "react";
-import { onPtyExit, onPtyOutput, ptyKill, ptyResize, ptySpawn, ptyWrite } from "../api";
-import type { UnlistenFn } from "@tauri-apps/api/event";
+import { ptyKill, ptySpawn } from "../api";
+import { forgetPty, readyPtyBus } from "../shared/terminal/ptyBus";
+import { XtermView, type XtermHandle } from "../shared/terminal/XtermView";
 
 interface Tab {
   id: number;
@@ -21,6 +20,7 @@ export function TerminalPanel({ defaultCwd }: TerminalPanelProps) {
 
   async function openTab(cwd: string) {
     const label = cwd.split("/").pop() ?? cwd;
+    await readyPtyBus();
     const ptyId = await ptySpawn(cwd, 80, 24);
     const tab: Tab = { id: ptyId, cwd, label, alive: true };
     setTabs((prev) => [...prev, tab]);
@@ -34,6 +34,7 @@ export function TerminalPanel({ defaultCwd }: TerminalPanelProps) {
   }, []);
 
   function closeTab(ptyId: number) {
+    forgetPty(ptyId);
     ptyKill(ptyId).catch(() => {});
     setTabs((prev) => prev.filter((t) => t.id !== ptyId));
     setActive((prev) => {
@@ -44,15 +45,15 @@ export function TerminalPanel({ defaultCwd }: TerminalPanelProps) {
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#0b0e14]">
+    <div className="flex h-full flex-col bg-[var(--bg)]">
       {/* tab bar */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-[#1c2230] px-2 py-1">
+      <div className="flex shrink-0 items-center gap-1 border-b border-[var(--line-soft)] px-2 py-1">
         {tabs.map((tab) => (
           <div
             key={tab.id}
             className={`flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs ${
               active === tab.id
-                ? "bg-[#1c2230] text-slate-200"
+                ? "bg-[var(--line-soft)] text-slate-200"
                 : "text-slate-600 hover:text-slate-400"
             } ${!tab.alive ? "opacity-50" : ""}`}
           >
@@ -99,89 +100,21 @@ export function TerminalPanel({ defaultCwd }: TerminalPanelProps) {
   );
 }
 
-interface TermPaneProps {
+export interface TermPaneProps {
   ptyId: number;
   visible: boolean;
   onDead: () => void;
 }
 
-function TermPane({ ptyId, visible, onDead }: TermPaneProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<XTerm | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
-
+/** A session's terminal, filling its (absolutely positioned) container. */
+export function TermPane({ ptyId, visible, onDead }: TermPaneProps) {
+  const view = useRef<XtermHandle>(null);
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const term = new XTerm({
-      theme: {
-        background: "#0b0e14",
-        foreground: "#d6dbe5",
-        cursor: "#7e9cd8",
-        selectionBackground: "#2d4f67",
-      },
-      fontFamily: '"JetBrains Mono", "Cascadia Code", "Fira Code", monospace',
-      fontSize: 13,
-      lineHeight: 1.4,
-      cursorBlink: true,
-    });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(container);
-    fit.fit();
-    termRef.current = term;
-    fitRef.current = fit;
-
-    term.onData((data) => {
-      ptyWrite(ptyId, data).catch(console.error);
-    });
-
-    let unlistenOutput: UnlistenFn | null = null;
-    let unlistenExit: UnlistenFn | null = null;
-
-    onPtyOutput((output) => {
-      if (output.id !== ptyId) return;
-      term.write(new Uint8Array(output.data));
-    }).then((fn) => {
-      unlistenOutput = fn;
-    });
-
-    onPtyExit((id) => {
-      if (id !== ptyId) return;
-      term.write("\r\n\x1b[90m[process exited]\x1b[0m\r\n");
-      onDead();
-    }).then((fn) => {
-      unlistenExit = fn;
-    });
-
-    const resizeObserver = new ResizeObserver(() => {
-      fit.fit();
-      ptyResize(ptyId, term.cols, term.rows).catch(() => {});
-    });
-    resizeObserver.observe(container);
-
-    return () => {
-      unlistenOutput?.();
-      unlistenExit?.();
-      resizeObserver.disconnect();
-      term.dispose();
-    };
-  }, [ptyId]);
-
-  useEffect(() => {
-    if (visible && fitRef.current && termRef.current) {
-      fitRef.current.fit();
-      ptyResize(ptyId, termRef.current.cols, termRef.current.rows).catch(() => {});
-      termRef.current.focus();
-    }
+    if (visible) view.current?.focus();
   }, [visible]);
-
   return (
-    <div
-      ref={containerRef}
-      className="absolute inset-0"
-      style={{ display: visible ? "block" : "none" }}
-    />
+    <div className="absolute inset-0" style={{ display: visible ? "block" : "none" }}>
+      <XtermView ref={view} ptyId={ptyId} visible={visible} onExit={onDead} />
+    </div>
   );
 }
