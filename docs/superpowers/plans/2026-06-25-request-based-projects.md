@@ -697,7 +697,7 @@
 - [ ] **Step 2: Manual verification**
 
   1. Launch the built app.
-  2. Create a project for `/Users/pro/Desktop/taskboard` named "Notifications work".
+  2. Create a project for `~/code/taskboard` named "Notifications work".
   3. Create another project for the same folder named "Refactor DB".
   4. Confirm both appear in the sidebar with the path shown.
   5. Add tasks to each and confirm they do not mix.
